@@ -1,0 +1,10 @@
+# Ignorar archivos innecesarios
+scripts/
+*.py
+*.bat
+*.vbs
+__pycache__/
+*.pyc
+*.xlsx
+*.xls
+*.json

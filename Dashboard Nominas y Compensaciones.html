@@ -29,7 +29,35 @@
             --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.04), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
             --premium-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
             --sidebar-bg: #0f172a;
-            --glass: rgba(255, 255, 255, 0.7);
+            --glass: rgba(255, 255, 255, 0.05);
+        }
+
+        .collapsed {
+            width: 80px !important;
+        }
+
+        .collapsed .logo-txt,
+        .collapsed .nav-item span,
+        .collapsed .sidebar-footer {
+            display: none !important;
+        }
+
+        .collapsed .nav-item {
+            justify-content: center;
+            padding: 14px 0;
+        }
+
+        .collapsed .nav-icon {
+            margin: 0 !important;
+            font-size: 20px;
+        }
+
+        .main.shrunk {
+            margin-left: 80px !important;
+        }
+
+        .main {
+            transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         * {
@@ -46,7 +74,6 @@
             min-height: 100vh;
         }
 
-        /* Premium Scrollbar */
         ::-webkit-scrollbar {
             width: 6px;
         }
@@ -63,31 +90,35 @@
         .sidebar {
             width: 280px;
             background: #fff;
-            color: var(--tx);
+            color: #1e293b;
             display: flex;
             flex-direction: column;
             position: fixed;
             height: 100vh;
             z-index: 100;
             box-shadow: 10px 0 30px rgba(0, 0, 0, 0.05);
-            border-right: 1px solid var(--bd);
+            border-right: 1px solid #e2e8f0;
+            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: hidden;
         }
 
         .logo-section {
             padding: 40px 30px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            border-bottom: 1px solid #f1f5f9;
+            overflow: hidden;
+            white-space: nowrap;
         }
 
         .logo-txt h1 {
             font-size: 26px;
             font-weight: 900;
             letter-spacing: -2px;
-            color: var(--ac);
+            color: #6366f1;
         }
 
         .logo-txt p {
             font-size: 10px;
-            color: var(--mu);
+            color: #64748b;
             text-transform: uppercase;
             letter-spacing: 2px;
             margin-top: 4px;
@@ -97,11 +128,13 @@
         .nav {
             padding: 20px 15px;
             flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
         }
 
         .nav-item {
             padding: 14px 20px;
-            margin-bottom: 5px;
+            margin-bottom: 8px;
             border-radius: 14px;
             cursor: pointer;
             font-size: 13px;
@@ -109,20 +142,75 @@
             display: flex;
             align-items: center;
             gap: 12px;
-            color: var(--mu);
-            transition: 0.3s;
+            color: #64748b;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            white-space: nowrap;
         }
 
         .nav-item:hover {
-            background: rgba(255, 255, 255, 0.05);
-            color: #fff;
-            transform: translateX(5px);
+            background: rgba(99, 102, 241, 0.05);
+            color: var(--ac);
+            transform: translateX(8px);
         }
 
         .nav-item.on {
-            background: var(--ac);
-            color: #fff;
-            box-shadow: 0 10px 20px rgba(99, 102, 241, 0.3);
+            background: linear-gradient(135deg, var(--ac), #818cf8) !important;
+            color: #fff !important;
+            box-shadow: 0 10px 25px rgba(99, 102, 241, 0.4);
+            position: relative;
+        }
+
+        .nav-item.on::after {
+            content: '';
+            position: absolute;
+            right: 15px;
+            width: 6px;
+            height: 6px;
+            background: #fff;
+            border-radius: 50%;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+        }
+
+        .nav-icon {
+            font-size: 18px;
+            width: 24px;
+            text-align: center;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .nav-item span {
+            transition: opacity 0.2s;
+        }
+
+        .collapsed .logo-section {
+            padding: 30px 20px;
+        }
+
+        .collapsed .logo-txt {
+            opacity: 0;
+        }
+
+        .collapsed .nav-item span {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .collapsed .nav-item {
+            padding: 14px;
+            justify-content: center;
+            margin: 4px 10px;
+        }
+
+        .collapsed .nav-icon {
+            margin: 0;
+            font-size: 18px;
+        }
+
+        .main.shrunk {
+            margin-left: 80px;
         }
 
         .main {
@@ -130,6 +218,7 @@
             margin-left: 280px;
             display: flex;
             flex-direction: column;
+            transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .topbar {
@@ -146,6 +235,7 @@
             z-index: 90;
             color: #fff;
             flex-wrap: wrap;
+            transition: none;
         }
 
         .top-left h2 {
@@ -173,13 +263,15 @@
 
         .pane {
             display: none;
+            opacity: 0;
             flex-direction: column;
             gap: 30px;
-            animation: fadeIn 0.4s ease-out;
         }
 
         .pane.on {
             display: flex;
+            opacity: 1;
+            animation: fadeIn 0.4s ease-out;
         }
 
         @keyframes fadeIn {
@@ -234,9 +326,9 @@
         }
 
         select {
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(255, 255, 255, 0.08);
             color: #fff;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.15);
             padding: 10px 18px;
             border-radius: 12px;
             font-size: 11px;
@@ -248,8 +340,8 @@
         }
 
         select:hover {
-            background: rgba(255, 255, 255, 0.1);
-            border-color: var(--ac);
+            background: rgba(255, 255, 255, 0.15);
+            border-color: #6366f1;
         }
 
         select option {
@@ -257,25 +349,47 @@
             color: #fff;
         }
 
-        .table-wrap {
-            border-radius: 20px;
-            overflow: hidden;
-            border: 1px solid var(--bd);
+        .search-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
         }
 
-        table {
-            width: 100%;
-            border-collapse: collapse;
+        .search-wrapper input {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #fff;
+            padding: 10px 15px 10px 35px;
+            border-radius: 12px;
+            font-size: 12px;
+            width: 250px;
+            outline: none;
+        }
+
+        .search-wrapper i {
+            position: absolute;
+            left: 12px;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        /* Light search for panes */
+        .pane-actions .search-wrapper input {
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            color: #1e293b;
+        }
+
+        .pane-actions .search-wrapper i {
+            color: #64748b;
         }
 
         th {
-            background: #f8fafc;
-            padding: 16px;
-            font-size: 11px;
-            font-weight: 800;
             color: var(--mu);
             text-transform: uppercase;
             text-align: left;
+            padding: 16px;
+            font-size: 11px;
+            font-weight: 800;
         }
 
         td {
@@ -345,21 +459,50 @@
             }
         }
 
-        .status-pill {
-            padding: 4px 12px;
-            border-radius: 100px;
-            font-size: 10px;
-            font-weight: 800;
+        .footer {
+            margin-top: auto;
+            background: #fff;
+            padding: 20px 40px;
+            border-top: 1px solid var(--bd);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--mu);
         }
 
-        .status-pill.up {
-            background: rgba(16, 185, 129, 0.1);
-            color: #10b981;
+        /* Premium Admin Dropdown Styles */
+        .admin-select {
+            width: 100%;
+            background: rgba(99, 102, 241, 0.05);
+            border: 1px solid transparent;
+            padding: 8px 12px;
+            border-radius: 10px;
+            font-family: 'Montserrat';
+            font-size: 11px;
+            font-weight: 700;
+            color: #1e293b;
+            cursor: pointer;
+            transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            outline: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236366f1' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            background-size: 10px;
         }
 
-        .status-pill.down {
-            background: rgba(239, 68, 68, 0.1);
-            color: #ef4444;
+        .admin-select:hover {
+            background-color: rgba(99, 102, 241, 0.1);
+            border-color: var(--ac);
+            transform: translateY(-1px);
+        }
+
+        .admin-select:focus {
+            background-color: #fff;
+            border-color: var(--ac);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15);
         }
     </style>
 </head>
@@ -375,21 +518,34 @@
         </div>
         <nav class="nav">
             <div class="nav-item on" onclick="switchTab(0)">
-                <span class="nav-icon">👤</span> Headcount (HC)
+                <div class="nav-icon"><i class="fas fa-users-viewfinder"></i></div>
+                <span>Headcount (HC)</span>
             </div>
             <div class="nav-item" onclick="switchTab(1)">
-                <span class="nav-icon">📊</span> Gestión de Plantilla
+                <div class="nav-icon"><i class="fas fa-chart-pie"></i></div>
+                <span>Gestión de Plantilla</span>
             </div>
             <div class="nav-item" onclick="switchTab(2)">
-                <span class="nav-icon">🚪</span> Desvinculaciones
+                <div class="nav-icon"><i class="fas fa-user-minus"></i></div>
+                <span>Desvinculaciones</span>
             </div>
-            <div class="nav-item" onclick="switchTab(3)"><i class="fas fa-exclamation-circle"></i> Incidencias</div>
-            <div class="nav-item" onclick="switchTab(4)"><i class="fas fa-file-invoice-dollar"></i> Conciliación ISR
+            <div class="nav-item" onclick="switchTab(3)">
+                <div class="nav-icon"><i class="fas fa-exclamation-triangle"></i></div>
+                <span>Incidencias</span>
             </div>
-            <div class="nav-item" onclick="switchTab(5)"><i class="fas fa-chart-pie"></i> Análisis de Costos</div>
+            <div class="nav-item" onclick="switchTab(4)">
+                <div class="nav-icon"><i class="fas fa-file-invoice-dollar"></i></div>
+                <span>Conciliación ISR</span>
+            </div>
+            <div class="nav-item" onclick="switchTab(5)">
+                <div class="nav-icon"><i class="fas fa-money-bill-trend-up"></i></div>
+                <span>Análisis de Costos</span>
+            </div>
             <div class="nav-item" onclick="switchTab(6)"
-                style="background:var(--slate-800); border-top:1px solid rgba(255,255,255,0.1); margin-top:10px;"><i
-                    class="fas fa-user-shield"></i> Admin: Clasificación</div>
+                style="border-top:1px solid #f1f5f9; margin-top:10px; padding-top:10px;">
+                <div class="nav-icon"><i class="fas fa-user-shield"></i></div>
+                <span>Admin: Clasificación</span>
+            </div>
         </nav>
 
         <div
@@ -406,7 +562,10 @@
 
     <main class="main">
         <header class="topbar">
-            <div class="top-left">
+            <div class="top-left" style="display:flex; align-items:center; gap:15px;">
+                <button onclick="toggleSidebar()"
+                    style="background:transparent; border:none; color:#fff; font-size:20px; cursor:pointer;"><i
+                        class="fas fa-bars"></i></button>
                 <h2 id="tabTitle">Headcount (HC)</h2>
             </div>
             <div class="top-right">
@@ -706,8 +865,8 @@
                                     <th style="padding:15px; width:30%;">POSICIÓN (PLANILLA)</th>
                                     <th style="padding:15px; width:10%;">PAÍS</th>
                                     <th style="padding:15px; width:15%;">EMPRESA</th>
-                                    <th style="padding:15px;">DIRECCIÓN</th>
-                                    <th style="padding:15px;">DEPARTAMENTO</th>
+                                    <th style="padding:15px; width:20%;">DIRECCIÓN</th>
+                                    <th style="padding:15px; width:20%;">DEPARTAMENTO</th>
                                 </tr>
                             </thead>
                             <tbody id="tbodyMappings"></tbody>
@@ -722,7 +881,7 @@
                 <div class="pulse-dot" style="animation-duration: 2s;"></div>
                 SISTEMA ACTUALIZADO | <span id="lastUpdateDisp">---</span>
             </div>
-            <div>ASYS RRHH Corporativo | HC Total: <span id="hcDisp" style="color:var(--ac); font-weight:800;">0</span>
+            <div>ASYS DDHH Corporativo | HC Total: <span id="hcDisp" style="color:var(--ac); font-weight:800;">0</span>
             </div>
         </footer>
     </main>
@@ -749,6 +908,7 @@
         const app = window.hcFullData || { employees: [], summary: [], bajas_data: { reasons: {} }, incidencias: [], updated: "" };
         let activeTab = 0;
         let activeCharts = [];
+        window.costSearch = "";
 
         const monthNames = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
         const paisMap = { 'GT': 'Guatemala', 'CR': 'Costa Rica', 'HN': 'Honduras', 'SV': 'El Salvador', 'NI': 'Nicaragua', 'PA': 'Panamá', 'PN': 'Panamá', 'PY': 'Paraguay', 'JM': 'Jamaica', 'TT': 'Trinidad & Tobago', 'RD': 'Rep. Dominicana' };
@@ -771,6 +931,13 @@
             'OTHER': { color: '#94a3b8', flag: '🌎', fUrl: '' }
         };
         const getStyle = (p) => countryStyles[p] || countryStyles['OTHER'];
+
+        function toggleSidebar() {
+            const sb = document.getElementById('sidebar');
+            const main = document.querySelector('.main');
+            sb.classList.toggle('collapsed');
+            main.classList.toggle('shrunk');
+        }
 
         function switchTab(n) {
             activeTab = n;
@@ -931,6 +1098,7 @@
             const c = getCurrency();
             return c + (val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
+        const fM = fmtMoney;
 
         function updateStatusPhrase(p, e, count) {
             const ptext = p === 'ALL' ? 'todas las regiones' : (paisMap[p] || p);
@@ -1086,11 +1254,17 @@
             const trendDataMap = Array.from({ length: 12 }, () => new Set());
             const empsRaw = app.employees || [];
 
+            const area = document.getElementById('areaSel').value;
+            const depto = document.getElementById('deptoSel').value;
+
             empsRaw.forEach(e => {
                 if (y !== 'ALL' && e.y != parseInt(y)) return;
                 const pais = document.getElementById('paisSel').value;
                 const empresa = document.getElementById('empresaSel').value;
-                if ((pais === 'ALL' || e.pa === pais) && (empresa === 'ALL' || e.e === empresa)) {
+                if ((pais === 'ALL' || e.pa === pais) &&
+                    (empresa === 'ALL' || e.e === empresa) &&
+                    (area === 'ALL' || e.dir === area) &&
+                    (depto === 'ALL' || e.d === depto)) {
                     if (e.m >= 1 && e.m <= 12) trendDataMap[e.m - 1].add(e.c || e.n);
                 }
             });
@@ -1120,30 +1294,38 @@
             }));
 
             // === 3. Presencia Regional (Grid con Banderas) ===
-            const paisesCounts = {};
-            uniqueEmps.forEach(e => { const ps = e.pa || 'GT'; paisesCounts[ps] = (paisesCounts[ps] || 0) + 1; });
-            const sortedPais = Object.entries(paisesCounts).sort((a, b) => b[1] - a[1]);
+            const priorityCountries = ['GT', 'CR', 'HN', 'SV', 'NI', 'PA', 'PY', 'JM', 'TT', 'RD'];
+            const countriesFound = {};
+            uniqueEmps.forEach(e => {
+                countriesFound[e.pa] = (countriesFound[e.pa] || 0) + 1;
+            });
+
             const ctn = document.getElementById('countryGrid');
             if (ctn) {
-                ctn.style.display = 'grid'; ctn.style.gridTemplateColumns = 'repeat(auto-fill, minmax(240px, 1fr))'; ctn.style.gap = '15px';
-                ctn.innerHTML = sortedPais.map(([p, count]) => {
+                ctn.style.display = 'grid';
+                ctn.style.gridTemplateColumns = 'repeat(auto-fill, minmax(280px, 1fr))';
+                ctn.style.gap = '20px';
+                ctn.innerHTML = priorityCountries.map(p => {
+                    const count = countriesFound[p] || 0;
                     const st = getStyle(p);
-                    const flagContent = st.fUrl ? `<img src="${st.fUrl}" style="width:36px; height:auto; border-radius:4px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">` : st.flag;
+                    const name = paisMap[p] || p;
+                    const flagContent = st.fUrl ? `<img src="${st.fUrl}" style="width:36px; height:24px; border-radius:4px; object-fit:cover; box-shadow:0 2px 4px rgba(0,0,0,0.1);">` : st.flag;
+
                     return `
                     <div style="display: flex; align-items: center; justify-content: space-between; padding: 20px; background:#fff; border-radius:18px; border:1px solid #e2e8f0; border-left: 6px solid ${st.color}; box-shadow: 0 4px 15px rgba(0,0,0,0.03); transition: transform 0.2s;">
                         <div style="display: flex; align-items: center; gap: 14px;">
-                            <div style="background: #f8fafc; width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); overflow:hidden;">${flagContent}</div>
+                            <div style="background: #f8fafc; width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); overflow:hidden; flex-shrink:0;">${flagContent}</div>
                             <div style="display:flex; flex-direction:column;">
-                                <span style="font-weight: 800; color: #1e293b; font-size: 14px;">${paisMap[p] || p}</span>
-                                <span style="font-size: 9px; color: #94a3b8; font-weight: 700; text-transform:uppercase; letter-spacing: 0.5px;">Regional ${p}</span>
+                                <span style="font-weight: 800; color: #1e293b; font-size: 14px;">${name}</span>
+                                <span style="font-size: 9px; color: #94a3b8; font-weight: 700; text-transform:uppercase; letter-spacing: 0.5px;">Sede Regional</span>
                             </div>
                         </div>
                         <div style="text-align: right;">
-                            <div style="font-weight: 900; font-size: 20px; color: ${st.color}; line-height: 1;">${count.toLocaleString()}</div>
-                            <div style="font-size: 7px; color: #94a3b8; font-weight: 800; letter-spacing: 0.5px; margin-top: 4px;">COLABORADORES</div>
+                            <div style="font-weight: 900; font-size: 20px; color: ${count > 0 ? st.color : '#cbd5e1'}; line-height: 1;">${count.toLocaleString()}</div>
+                            <div style="font-size: 7px; color: #94a3b8; font-weight: 800; letter-spacing: 0.5px; margin-top: 4px;">PERSONAS</div>
                         </div>
                     </div>`;
-                }).join('') || '<p style="padding: 40px; text-align: center; color: #94a3b8;">Sin datos disponibles</p>';
+                }).join('');
             }
         }
 
@@ -1524,7 +1706,7 @@
             const sign = diffIVA >= 0 ? '+' : '';
 
             pane.innerHTML = `
-                <div class="sat-view">
+                <div class="sat-view" style="color:#fff; background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); padding: 40px; border-radius: 40px; border: 1px solid rgba(255,255,255,0.05); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);">
                     <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 40px; border-bottom: 1.5px solid rgba(255,255,255,0.15); padding-bottom: 20px;">
                         <div style="display: flex; align-items: center; gap: 20px;">
                             <div style="font-family:'Montserrat'; font-size: clamp(32px, 5vw, 56px); font-weight: 800; color: #fff; letter-spacing: -4px; line-height: 1;">ASYS</div>
@@ -1534,9 +1716,9 @@
                             </div>
                         </div>
                         <div style="display:flex; flex-direction:column; align-items:flex-end; gap:12px;">
-                            <div class="search-wrapper" style="width:320px;">
-                                <input type="text" placeholder="Buscar en ISR..." onkeyup="filterTable('tbodyGeneral', this.value)">
-                                <i class="fas fa-search"></i>
+                            <div class="search-wrapper" style="width:320px; position:relative;">
+                                <input type="text" placeholder="Buscar en ISR..." onkeyup="filterTable('tbodyGeneral', this.value)" style="width:100%; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:12px; padding:12px 40px 12px 15px; color:#fff;">
+                                <i class="fas fa-search" style="position:absolute; right:15px; top:50%; transform:translateY(-50%); color:rgba(255,255,255,0.5);"></i>
                             </div>
                             <button class="btn-top" style="box-shadow:0 10px 20px rgba(0,0,0,0.4); width:320px;" onclick="exportData()">📥 Reporte Ejecutorio</button>
                             <div style="text-align: right; font-size: 11px; font-weight: 700; color: #fff; line-height: 1.4; opacity: 0.9;">
@@ -1545,19 +1727,17 @@
                         </div>
                     </div>
 
-                    <div class="sat-view-header-grid">
+                    <div class="sat-view-header-grid" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 20px; margin-bottom: 40px;">
                         <div class="isr-kpi-black" style="background:transparent; padding:0;">
-                            <label style="margin-bottom:8px;">EMPRESA SELECCIONADA</label>
+                            <label style="margin-bottom:8px; font-size: 9px; font-weight: 800; color: #94a3b8; text-transform: uppercase;">EMPRESA SELECCIONADA</label>
                             <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); padding: 10px 15px; border-radius: 12px; font-size: 13px; font-weight: 800; display: flex; justify-content: space-between; align-items: center;">
                                 <span>${e === 'ALL' ? 'TODAS (GT)' : e}</span>
-                                <span style="font-size: 8px; opacity: 0.5;">▼</span>
                             </div>
                         </div>
                         <div class="isr-kpi-black" style="background:transparent; padding:0;">
-                            <label style="margin-bottom:8px;">PERIODO FISCAL</label>
+                            <label style="margin-bottom:8px; font-size: 9px; font-weight: 800; color: #94a3b8; text-transform: uppercase;">PERIODO FISCAL</label>
                             <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); padding: 10px 15px; border-radius: 12px; font-size: 13px; font-weight: 800; display: flex; justify-content: space-between; align-items: center;">
                                 <span>${y === 'ALL' ? 'HISTÓRICO' : y}</span>
-                                <span style="font-size: 8px; opacity: 0.5;">▼</span>
                             </div>
                         </div>
                         <div style="text-align:center;"><label style="font-size:9px; font-weight:800; opacity:0.6;">COLABORADORES</label><div style="font-size:42px; font-weight:800;">${d.tot}</div></div>
@@ -1565,7 +1745,7 @@
                         <div style="text-align:center;"><label style="font-size:9px; font-weight:800; opacity:0.6;">DEVUELTO EN BAJAS</label><div style="font-size:42px; font-weight:800; color:#f87171;">${d.baj}</div></div>
                     </div>
 
-                    <div class="sat-view-cards-grid">
+                    <div class="sat-view-cards-grid" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 20px; margin-bottom: 40px;">
                         ${isrCardHTML("RETENCIONES A DEVOLVER", "Q " + d.dt.toLocaleString(), "DEVOLUCIÓN PATRONAL", "#4ade80")}
                         ${isrCardHTML("PENDIENTE DE PAGO", "Q " + d.pp.toLocaleString(), "RETENCIÓN PENDIENTE", "#f87171")}
                         ${isrCardHTML("RETENCIONES PRACTICADAS", "Q " + d.rp.toLocaleString(), "MONTO REAL RETENIDO", "#fff")}
@@ -1573,12 +1753,12 @@
                         ${isrCardHTML("DEVUELTO EN BAJAS", "Q " + d.db.toLocaleString(), "GESTIÓN DE LIQUIDACIÓN", "#fff")}
                     </div>
 
-                    <div class="grid-main" style="margin-bottom:0;">
-                        <div style="background:rgba(0,0,0,0.2); border-radius:25px; padding:30px;">
+                    <div class="grid-main" style="display: grid; grid-template-columns: 2fr 1fr; gap: 30px;">
+                        <div style="background:rgba(0,0,0,0.2); border-radius:25px; padding:30px; border:1px solid rgba(255,255,255,0.05);">
                             <h3 style="font-family:'Montserrat'; font-size:18px; margin-bottom:25px;">EVOLUCIÓN ANUAL: RETENIDO VS IMPUESTO A PAGAR</h3>
                             <div style="height:350px;"><canvas id="chartISR"></canvas></div>
                         </div>
-                        <div style="background:rgba(0,0,0,0.2); border-radius:25px; padding:30px; display:flex; flex-direction:column; justify-content:space-between;">
+                        <div style="background:rgba(0,0,0,0.2); border-radius:25px; padding:30px; border:1px solid rgba(255,255,255,0.05); display:flex; flex-direction:column; justify-content:space-between;">
                             <div style="display:flex; justify-content:space-between;"><h3>FORMULARIO SAT</h3><span style="font-size:8px; opacity:0.6; border: 1px solid #fff; padding: 2px 6px; border-radius: 4px;">ID: SAT-1481-${y === 'ALL' ? '2025' : y}</span></div>
                             <div style="text-align:center; margin: 20px 0; background:rgba(255,255,255,0.03); border-radius: 20px; padding: 20px;">
                                 <div style="font-size:9px; font-weight: 800; opacity: 0.6; margin-bottom: 15px;">PLANILLAS IVA</div>
@@ -1590,7 +1770,6 @@
                                         <div style="font-size: 8px; font-weight: 800; opacity: 0.5;">AÑO ANTERIOR</div>
                                         <div style="font-size: 16px; font-weight: 800; color: #06b6d4;">${prevIVA > 0 ? prevIVA : '---'}</div>
                                         <div style="font-size: 12px; margin-top: 5px; color:${diffIVA >= 0 ? '#4ade80' : '#f87171'}; font-weight:800;">${sign}${diffPct}%</div>
-                                        <div style="font-size: 7px; font-weight: 700; opacity: 0.4; text-transform: uppercase;">VARIACIÓN YOY</div>
                                     </div>
                                 </div>
                                 <div style="background:rgba(0,0,0,0.3); padding:15px; border-radius:15px; margin-top:20px; border-left: 4px solid #4ade80;">
@@ -1602,7 +1781,6 @@
                                 <div style="font-size:24px; font-weight:800; display:flex; align-items:baseline; justify-content:center; gap:4px;">
                                     <span style="font-size:0.6em; opacity:0.5;">Q</span>${d.rb.toLocaleString()}
                                 </div>
-                                <div style="font-size: 7px; opacity: 0.3; font-weight: 800; margin-top: 5px;">SIN HISTÓRICO</div>
                             </div>
                         </div>
                     </div>
@@ -1615,7 +1793,7 @@
             const formatted = String(v).startsWith('Q')
                 ? `<span style="font-size:0.5em; opacity:0.6; margin-right:4px;">Q</span>${String(v).substring(1).trim()}`
                 : v;
-            return `<div class="isr-kpi-black"><label>${l}</label><div class="val" style="color:${c}; display:flex; align-items:baseline;">${formatted}</div><div class="sub">${s}</div></div>`;
+            return `<div class="isr-kpi-black" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); padding: 25px; border-radius: 24px; backdrop-filter: blur(10px);"><label style="font-size: 9px; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 15px; display: block; letter-spacing: 1px;">${l}</label><div class="val" style="color:${c}; font-family: 'Montserrat'; font-size: 28px; font-weight: 800; display:flex; align-items:baseline;">${formatted}</div><div class="sub" style="font-size: 9px; font-weight: 700; color: #64748b; margin-top: 8px;">${s}</div></div>`;
         }
 
         function initISRDetailCharts(filtered) {
@@ -1658,41 +1836,70 @@
 
         function renderCostos(s, emps) {
             const pane = document.getElementById('costosView');
-            if (!pane) { console.error('costosView not found'); return; }
+            if (!pane) return;
 
-            let showUSD = window.useUSD || false;
+            const showUSD = window.useUSD || false;
             const currency = showUSD ? '$' : getCurrency();
             const fM = (v) => currency + " " + (v || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
-            // 1. Core Totals
-            const tGross = emps.reduce((a, b) => a + (Number(showUSD ? b.gusd : b.g) || 0), 0);
-            const tPat = emps.reduce((a, b) => a + (Number(showUSD ? (b.p_pat / (b.xr || 1)) : b.p_pat) || 0), 0);
-            const tAgui = emps.reduce((a, b) => a + (Number(showUSD ? (b.p_agui / (b.xr || 1)) : b.p_agui) || 0), 0);
-            const tB14 = emps.reduce((a, b) => a + (Number(showUSD ? (b.p_b14 / (b.xr || 1)) : b.p_b14) || 0), 0);
-            const tVac = emps.reduce((a, b) => a + (Number(showUSD ? (b.p_vac / (b.xr || 1)) : b.p_vac) || 0), 0);
-            const tInd = emps.reduce((a, b) => a + (Number(showUSD ? (b.p_ind / (b.xr || 1)) : b.p_ind) || 0), 0);
-            const tVar = emps.reduce((a, b) => a + (Number(showUSD ? (b.bv / (b.xr || 1)) : b.bv) || 0), 0);
-            const tTotal = tGross + tPat + tAgui + tB14 + tVac + tInd;
+            // 1. Filter Logic First
+            let filtered = emps;
+            if (window.costSearch) {
+                const sVal = window.costSearch.toLowerCase();
+                filtered = emps.filter(e =>
+                    (e.n || '').toLowerCase().includes(sVal) ||
+                    (e.p || '').toLowerCase().includes(sVal) ||
+                    (e.c || '').toLowerCase().includes(sVal)
+                );
+            }
 
-            // 2. Trend Logic (Variable Pay)
+            // 2. Core Totals based on user formula: Ingresos + Provisions + Patronal
+            const tGross = filtered.reduce((a, b) => a + (Number(showUSD ? (b.gusd || b.g / (b.xr || 1)) : (b.g || 0))), 0);
+            const tPat = filtered.reduce((a, b) => a + (Number(showUSD ? (b.p_pat / (b.xr || 1)) : b.p_pat) || 0), 0);
+            const tAgui = filtered.reduce((a, b) => a + (Number(showUSD ? (b.p_agui / (b.xr || 1)) : b.p_agui) || 0), 0);
+            const tB14 = filtered.reduce((a, b) => a + (Number(showUSD ? (b.p_b14 / (b.xr || 1)) : b.p_b14) || 0), 0);
+            const tVac = filtered.reduce((a, b) => a + (Number(showUSD ? (b.p_vac / (b.xr || 1)) : b.p_vac) || 0), 0);
+            const tInd = filtered.reduce((a, b) => a + (Number(showUSD ? (b.p_ind / (b.xr || 1)) : b.p_ind) || 0), 0);
+            const tVar = filtered.reduce((a, b) => a + (Number(showUSD ? (b.bv / (b.xr || 1)) : b.bv) || 0), 0);
+
+            const tProv = tAgui + tB14 + tVac + tInd;
+            const tTotal = tGross + tPat + tProv;
+
+            // 3. Trend Logic (Variable Pay) - Synchronized with all global filters
             const monthLabels = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
             const varTrend = new Array(12).fill(0);
-            const { yr } = getFilters();
+            const { p: pais, e: emp, a: area, d: depto, y: yr } = getFilters();
+
             app.employees.forEach(e => {
-                if ((yr === 'ALL' || e.y == yr) && e.m >= 1 && e.m <= 12) {
+                const matchYr = yr === 'ALL' || e.y == yr;
+                const matchPais = pais === 'ALL' || e.pa === pais;
+                const matchEmp = emp === 'ALL' || e.e === emp;
+                const matchArea = area === 'ALL' || e.dir === area;
+                const matchDepto = depto === 'ALL' || e.d === depto;
+
+                if (matchYr && matchPais && matchEmp && matchArea && matchDepto && e.m >= 1 && e.m <= 12) {
                     varTrend[e.m - 1] += (Number(showUSD ? (e.bv / (e.xr || 1)) : e.bv) || 0);
                 }
             });
 
-            // 3. Render Dashboard Layout
-            pane.innerHTML = `
-                <div id="kpiCosts" class="kpi-row" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 20px; margin-bottom: 30px;">
-                    ${kpiCard("Total Gasto", fM(tTotal), '<i class="fa-solid fa-money-bill-trend-up"></i>', "#6366f1", "Costo Empresa Total")}
-                    ${kpiCard("Planilla Bruta", fM(tGross), '<i class="fa-solid fa-file-invoice-dollar"></i>', "#3b82f6", "Ingresos Colaboradores")}
-                    ${kpiCard("Carga Patronal", fM(tPat), '<i class="fa-solid fa-building-columns"></i>', "#10b981", "Cuotas Patronales")}
-                    ${kpiCard("Provisiones", fM(tAgui + tB14 + tVac + tInd), '<i class="fa-solid fa-clock-rotate-left"></i>', "#f59e0b", "Agui+B14+Vac+Ind")}
-                    ${kpiCard("Bono Variable", fM(tVar), '<i class="fa-solid fa-chart-line"></i>', "#ec4899", "Total Variable Pagado")}
+            // 4. Update Header and KPIs WITHOUT destroying the whole pane if possible
+            // But since switchTab(5) calls renderCostos, we need to check if we just need an update
+            const needsFullRender = !pane.querySelector('#tbodyCostos') || !pane.querySelector('#costSearch');
+
+            if (needsFullRender) {
+                pane.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; background:rgba(255,255,255,0.02); padding:20px 25px; border-radius:15px; border:1px solid rgba(255,255,255,0.05);">
+                    <div>
+                        <h2 style="font-size:1.5rem; font-weight:800; color:var(--ac); margin:0;">💰 ANÁLISIS DE COSTOS OPERATIVOS</h2>
+                        <p style="font-size:0.9rem; opacity:0.6; margin:5px 0 0;">Proyección 2025: Ingresos + Provisiones + Carga Patronal</p>
+                    </div>
+                    <div style="display:flex; background:#f1f5f9; padding:5px; border-radius:12px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);">
+                        <button onclick="window.useUSD=false; renderAll();" style="border:none; padding:10px 20px; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer; transition:0.3s; background:${!showUSD ? 'var(--ac)' : 'transparent'}; color:${!showUSD ? '#fff' : '#64748b'};">LOCAL</button>
+                        <button onclick="window.useUSD=true; renderAll();" style="border:none; padding:10px 20px; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer; transition:0.3s; background:${showUSD ? 'var(--ac)' : 'transparent'}; color:${showUSD ? '#fff' : '#64748b'};">USD ($)</button>
+                    </div>
                 </div>
+
+                <div id="kpiCosts" class="kpi-row" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 20px; margin-bottom: 30px;"></div>
 
                 <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 25px; margin-bottom: 30px;">
                     <div class="card-box">
@@ -1717,22 +1924,22 @@
                 </div>
 
                 <div class="card-box" style="margin-bottom: 30px;">
-                    <div class="card-title" style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #f1f5f9; padding-bottom:15px;">
+                    <div class="card-title" style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #f1f5f9; padding-bottom:15px; margin-bottom:15px;">
                         <div>
                             <h3 style="font-size:18px;">Detalle de Colaboradores</h3>
                             <p>Desglose financiero pormenorizado</p>
                         </div>
                         <div style="display:flex; align-items:center; gap:20px;">
-                            <div style="display:flex; background:#f1f5f9; padding:5px; border-radius:100px;">
-                                <button onclick="window.useUSD=false; renderAll();" class="toggle-tab ${!showUSD ? 'active' : ''}" style="border:none; padding:8px 20px; border-radius:100px; font-size:11px; font-weight:800; cursor:pointer; background:${!showUSD ? 'var(--ac)' : 'transparent'}; color:${!showUSD ? '#fff' : '#64748b'}; transition:0.3s;">LOCAL</button>
-                                <button onclick="window.useUSD=true; renderAll();" class="toggle-tab ${showUSD ? 'active' : ''}" style="border:none; padding:8px 20px; border-radius:100px; font-size:11px; font-weight:800; cursor:pointer; background:${showUSD ? 'var(--ac)' : 'transparent'}; color:${showUSD ? '#fff' : '#64748b'}; transition:0.3s;">USD ($)</button>
+                            <div class="search-wrapper" style="box-shadow: 0 4px 10px rgba(0,0,0,0.05); border-radius:12px;">
+                                <i class="fas fa-search" style="left: 15px; color: #94a3b8;"></i>
+                                <input type="text" id="costSearch" placeholder="Escriba para buscar: nombre / puesto / código..." 
+                                       style="width: 320px; padding: 12px 15px 12px 45px; border-radius: 12px; border: 1px solid #e2e8f0; font-family: 'Montserrat'; font-size: 12px; outline: none; transition: 0.2s;"
+                                       oninput="applyCostSearch(this.value)" value="${window.costSearch || ''}">
                             </div>
-                            <button onclick="exportData()" class="btn-top" style="width:200px; background:var(--gr); border:none; height:40px;">📥 Excel Completo</button>
+                            <button onclick="exportData()" class="btn-top" style="width:180px; background:var(--gr); border:none; height:42px; border-radius:12px; font-size:11px;">📥 Excel Completo</button>
                         </div>
                     </div>
-                    <div style="padding:15px; background:rgba(99,102,241,0.05); border-radius:12px; margin: 15px 0; font-size:11px; color:var(--ac); font-weight:600;">
-                        <i class="fas fa-info-circle"></i> Mostrando los primeros 500 registros para optimizar velocidad. Para el detalle completo de los ${emps.length.toLocaleString()} registros, utilice el botón de <b>Excel Completo</b>.
-                    </div>
+                    <div id="costLimitMsg" style="padding:15px; background:rgba(99,102,241,0.05); border-radius:12px; margin: 15px 0; font-size:11px; color:var(--ac); font-weight:600;"></div>
                     <div class="table-wrap" style="max-height: 800px; overflow: auto; border:none; box-shadow:none;">
                         <table id="costTable" style="min-width: 1600px; border-collapse: collapse;">
                             <thead>
@@ -1755,11 +1962,25 @@
                         </table>
                     </div>
                 </div>
+                `;
+            }
+
+            // Update Dynamic Parts
+            document.getElementById('kpiCosts').innerHTML = `
+                ${kpiCard("Total Gasto", fM(tTotal), '<i class="fa-solid fa-money-bill-trend-up"></i>', "#6366f1", "Ingresos + Prov + Pat")}
+                ${kpiCard("Planilla Bruta", fM(tGross), '<i class="fa-solid fa-file-invoice-dollar"></i>', "#3b82f6", "Total Ingresos")}
+                ${kpiCard("Provisiones", fM(tProv), '<i class="fa-solid fa-clock-rotate-left"></i>', "#f59e0b", "Agui+B14+Vac+Ind")}
+                ${kpiCard("Carga Patronal", fM(tPat), '<i class="fa-solid fa-building-columns"></i>', "#10b981", "Cuotas Patronales")}
+                ${kpiCard("Bono Variable", fM(tVar), '<i class="fa-solid fa-chart-line"></i>', "#ec4899", "Total Variable")}
             `;
 
-            // Table rendering optimization
             const tbody = document.getElementById('tbodyCostos');
-            const dataLimit = emps.slice(0, 500);
+            const dataLimit = filtered.slice(0, 500);
+            const msgEl = document.getElementById('costLimitMsg');
+            if (msgEl) {
+                msgEl.innerHTML = `<i class="fas fa-info-circle"></i> Encontrados: <b>${filtered.length.toLocaleString()}</b>. Mostrando los primeros 500 para optimización.`;
+            }
+
             tbody.innerHTML = dataLimit.map(e => {
                 const c = (v) => (showUSD ? (v / (e.xr || 1)) : v) || 0;
                 return `
@@ -1839,6 +2060,11 @@
                 },
                 options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
             }));
+        }
+
+        function applyCostSearch(val) {
+            window.costSearch = val;
+            renderAll();
         }
 
         function exportData() {
@@ -1963,11 +2189,11 @@
             return res;
         }
 
+
         function renderMappings() {
             const tbody = document.getElementById('tbodyMappings');
             if (!tbody) return;
 
-            // Get unique combinations of Puesto, Pais, Empresa
             const keys = new Set();
             const combos = [];
             app.employees.forEach(e => {
@@ -1977,58 +2203,84 @@
                 const key = `${p}|${pa}|${emp}`;
                 if (!keys.has(key)) {
                     keys.add(key);
-                    combos.push({ p, pa, emp, key });
+                    combos.push({ p, pa, emp, key, dir: e.dir, d: e.d });
                 }
             });
             combos.sort((a, b) => a.p.localeCompare(b.p));
 
-            const mappings = getSavedMappings();
-
             tbody.innerHTML = combos.map(c => {
-                const m = mappings[c.key];
+                const safeP = c.p.replace(/'/g, "\\'");
+                const safePa = c.pa.replace(/'/g, "\\'");
+                const safeEmp = c.emp.replace(/'/g, "\\'");
 
-                // Use intelligent defaults if not manually saved
-                let auto = { dir: '', d: '' };
-                if (!m) auto = getAutoMapping(c.p);
-
-                const mapDir = m ? m.dir : auto.dir;
-                const mapDepto = m ? m.d : auto.d;
-
-                const dirOptions = '<option value="">-- Seleccionar Dirección --</option>' +
-                    ASYS_DIRECCIONES.map(d => `<option value="${d}" ${mapDir === d ? 'selected' : ''}>${d}</option>`).join('');
-
-                const deptoOptions = '<option value="">-- Seleccionar Depto --</option>' +
-                    ASYS_DEPTOS.map(d => `<option value="${d}" ${mapDepto === d ? 'selected' : ''}\u003e${d}\u003c/option\u003e`).join('');
-
-                const rowStyle = !m ? 'background: #fff9db;' : ''; // Highlight non-saved (auto-mapped) rows
+                const dirOptions = ASYS_DIRECCIONES.map(d => `<option value="${d}" ${c.dir === d ? 'selected' : ''}>${d}</option>`).join('');
+                const deptoOptions = ASYS_DEPTOS.map(d => `<option value="${d}" ${c.d === d ? 'selected' : ''}>${d}</option>`).join('');
 
                 return `
-                <tr data-key="${c.key}" style="${rowStyle}">
-                    <td style="padding:15px; font-weight:700; color:var(--slate-700); border-bottom:1px solid #f1f5f9;">${c.p}</td>
-                    <td style="padding:15px; font-weight:800; color:var(--ac); border-bottom:1px solid #f1f5f9;">${c.pa}</td>
-                    <td style="padding:15px; font-weight:600; color:#64748b; border-bottom:1px solid #f1f5f9;">${c.emp}</td>
-                    <td style="padding:8px; border-bottom:1px solid #f1f5f9;">
-                        <select class="map-dir" style="width:100%; padding:8px; border:1.5px solid #e2e8f0; border-radius:10px; font-weight:700; background:white; color:var(--tx);">${dirOptions}</select>
+                <tr style="border-bottom:1px solid #f1f5f9; transition: background 0.2s;" onmouseover="this.style.background='rgba(99,102,241,0.02)'" onmouseout="this.style.background='transparent'">
+                    <td style="padding:15px; font-weight:700; color:var(--tx); font-size:11px;">${c.p}</td>
+                    <td style="padding:15px; font-weight:800; color:var(--ac); font-size:11px;">${c.pa}</td>
+                    <td style="padding:15px; font-weight:600; color:#64748b; font-size:11px;">${c.emp}</td>
+                    <td style="padding:10px;">
+                        <select class="admin-select" onchange="updateUIMapping('${safeP}','${safePa}','${safeEmp}', 'dir', this.value)">
+                            <option value="PENDIENTE" ${(!c.dir || c.dir === 'PENDIENTE') ? 'selected' : ''}>-- SELECCIONAR DIRECCIÓN --</option>
+                            ${dirOptions}
+                        </select>
                     </td>
-                    <td style="padding:8px; border-bottom:1px solid #f1f5f9;">
-                        <select class="map-depto" style="width:100%; padding:8px; border:1.5px solid #e2e8f0; border-radius:10px; font-weight:700; background:white; color:var(--tx);">${deptoOptions}</select>
+                    <td style="padding:10px;">
+                        <select class="admin-select" onchange="updateUIMapping('${safeP}','${safePa}','${safeEmp}', 'd', this.value)">
+                            <option value="PENDIENTE" ${(!c.d || c.d === 'PENDIENTE') ? 'selected' : ''}>-- SELECCIONAR DEPTO --</option>
+                            ${deptoOptions}
+                        </select>
                     </td>
                 </tr>`;
             }).join('');
         }
 
+        window.ui_overrides = {};
+        function updateUIMapping(p, pa, e, field, val) {
+            const key = `${p}|${pa}|${e}`;
+            if (!window.ui_overrides[key]) window.ui_overrides[key] = {};
+            window.ui_overrides[key][field] = val.trim();
+            console.log("Updated override:", key, field, val);
+        }
+
         function saveMappings() {
-            const mappings = {};
-            document.querySelectorAll('#tbodyMappings tr').forEach(tr => {
-                const key = tr.dataset.key;
-                const dir = tr.querySelector('.map-dir').value;
-                const d = tr.querySelector('.map-depto').value;
-                if (dir || d) mappings[key] = { dir, d };
+            exportMappingsExcel();
+        }
+
+        function exportMappingsExcel() {
+            // Generar Excel de 5 columnas para que el usuario edite
+            const keys = new Set();
+            const rows = [];
+            // Use the full employees list to ensure we capture all unique combos and sort alphabetically
+            const sortedEmps = [...app.employees].sort((a, b) => (a.p || '').localeCompare(b.p || ''));
+
+            sortedEmps.forEach(e => {
+                const p = (e.p || '').trim().toUpperCase();
+                const pa = e.pa || '';
+                const empresa = e.e || '';
+                const key = `${p}|${pa}|${empresa}`;
+
+                if (!keys.has(key)) {
+                    keys.add(key);
+                    // Merge with UI overrides if they exist
+                    const over = window.ui_overrides[key] || {};
+                    rows.push({
+                        'POSICIÓN (PLANILLA)': p,
+                        'PAÍS': pa,
+                        'EMPRESA': empresa,
+                        'DIRECCIÓN (ACTUAL)': over.dir || e.dir || 'PENDIENTE',
+                        'DEPARTAMENTO (ACTUAL)': over.d || e.d || 'PENDIENTE'
+                    });
+                }
             });
-            localStorage.setItem('asys_pos_map_v2', JSON.stringify(mappings));
-            alert('¡Clasificación Maestra Guardada! Los cambios se aplicarán ahora.');
-            lastFilterKey = ""; // Invalidate cache
-            renderAll();
+
+            const ws = XLSX.utils.json_to_sheet(rows);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Mapeo Maestro');
+            XLSX.writeFile(wb, 'clasificacion_maestra_EDITAR.xlsx');
+            alert('Se ha generado un Excel con el mapeo actual. Edítalo y guárdalo como "clasificacion_maestra.xlsx" en la carpeta del dashboard, luego ejecuta el script de actualización.');
         }
 
         function exportMappings() {

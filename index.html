@@ -1416,6 +1416,7 @@
             }));
 
             // Ranking (Responsibles)
+            const respEntries = Object.entries(responsables).sort((a, b) => b[1] - a[1]);
             const ranking = respEntries.slice(0, 6);
             const maxR = ranking.length > 0 ? ranking[0][1] : 1;
             const rankColors = ['#ef4444', '#f59e0b', '#6366f1', '#10b981', '#8b5cf6', '#06b6d4'];
@@ -1612,12 +1613,12 @@
 
             // 1. Core Totals
             const tGross = emps.reduce((a, b) => a + (Number(showUSD ? b.gusd : b.g) || 0), 0);
-            const tPat = emps.reduce((a, b) => a + (Number(showUSD ? (b.p_pat / (b.tr || 1)) : b.p_pat) || 0), 0);
-            const tAgui = emps.reduce((a, b) => a + (Number(showUSD ? (b.p_agui / (b.tr || 1)) : b.p_agui) || 0), 0);
-            const tB14 = emps.reduce((a, b) => a + (Number(showUSD ? (b.p_b14 / (b.tr || 1)) : b.p_b14) || 0), 0);
-            const tVac = emps.reduce((a, b) => a + (Number(showUSD ? (b.p_vac / (b.tr || 1)) : b.p_vac) || 0), 0);
-            const tInd = emps.reduce((a, b) => a + (Number(showUSD ? (b.p_ind / (b.tr || 1)) : b.p_ind) || 0), 0);
-            const tVar = emps.reduce((a, b) => a + (Number(showUSD ? (b.bv / (b.tr || 1)) : b.bv) || 0), 0);
+            const tPat = emps.reduce((a, b) => a + (Number(showUSD ? (b.p_pat / (b.xr || 1)) : b.p_pat) || 0), 0);
+            const tAgui = emps.reduce((a, b) => a + (Number(showUSD ? (b.p_agui / (b.xr || 1)) : b.p_agui) || 0), 0);
+            const tB14 = emps.reduce((a, b) => a + (Number(showUSD ? (b.p_b14 / (b.xr || 1)) : b.p_b14) || 0), 0);
+            const tVac = emps.reduce((a, b) => a + (Number(showUSD ? (b.p_vac / (b.xr || 1)) : b.p_vac) || 0), 0);
+            const tInd = emps.reduce((a, b) => a + (Number(showUSD ? (b.p_ind / (b.xr || 1)) : b.p_ind) || 0), 0);
+            const tVar = emps.reduce((a, b) => a + (Number(showUSD ? (b.bv / (b.xr || 1)) : b.bv) || 0), 0);
             const tTotal = tGross + tPat + tAgui + tB14 + tVac + tInd;
 
             // 2. Trend Logic (Variable Pay)
@@ -1626,7 +1627,7 @@
             const { yr } = getFilters();
             app.employees.forEach(e => {
                 if ((yr === 'ALL' || e.y == yr) && e.m >= 1 && e.m <= 12) {
-                    varTrend[e.m - 1] += (Number(showUSD ? (e.bv / (e.tr || 1)) : e.bv) || 0);
+                    varTrend[e.m - 1] += (Number(showUSD ? (e.bv / (e.xr || 1)) : e.bv) || 0);
                 }
             });
 

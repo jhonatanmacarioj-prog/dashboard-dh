@@ -621,44 +621,44 @@
                     <!-- Dynamic content will be rendered here by renderCostos() -->
                 </div>
             </div>
-        </div>
-        </div>
-        <div id="pane6" class="pane">
-            <div class="pane-header">
-                <div>
-                    <h2 style="font-size:24px; font-weight:800; color:var(--tx);">Clasificación Maestra</h2>
-                    <p style="font-size:12px; color:var(--mu);">Mapeo oficial de Puestos a Áreas y Direcciones</p>
-                </div>
-                <div class="pane-actions" style="display:flex; gap:10px;">
-                    <button class="btn-top" style="background:#6366f1;" onclick="exportMappings()">📤 Exportar
-                        Mapeo</button>
-                    <button class="btn-top" style="background:#8b5cf6;"
-                        onclick="document.getElementById('importFile').click()">📥 Importar Mapeo</button>
-                    <input type="file" id="importFile" style="display:none" onchange="importMappings(this)">
-                    <div class="search-wrapper">
-                        <input type="text" placeholder="Buscar posición..."
-                            onkeyup="filterTable('tbodyMappings', this.value)">
-                        <i class="fas fa-search"></i>
+
+            <div id="pane6" class="pane">
+                <div class="pane-header">
+                    <div>
+                        <h2 style="font-size:24px; font-weight:800; color:var(--tx);">Clasificación Maestra</h2>
+                        <p style="font-size:12px; color:var(--mu);">Mapeo oficial de Puestos a Áreas y Direcciones</p>
                     </div>
-                    <button class="btn-top" style="background:#10b981;" onclick="saveMappings()">💾 Guardar
-                        Cambios</button>
+                    <div class="pane-actions" style="display:flex; gap:10px;">
+                        <button class="btn-top" style="background:#6366f1;" onclick="exportMappings()">📤 Exportar
+                            Mapeo</button>
+                        <button class="btn-top" style="background:#8b5cf6;"
+                            onclick="document.getElementById('importFile').click()">📥 Importar Mapeo</button>
+                        <input type="file" id="importFile" style="display:none" onchange="importMappings(this)">
+                        <div class="search-wrapper">
+                            <input type="text" placeholder="Buscar posición..."
+                                onkeyup="filterTable('tbodyMappings', this.value)">
+                            <i class="fas fa-search"></i>
+                        </div>
+                        <button class="btn-top" style="background:#10b981;" onclick="saveMappings()">💾 Guardar
+                            Cambios</button>
+                    </div>
                 </div>
-            </div>
-            <div class="card-box" style="padding:0; overflow:hidden;">
-                <div style="max-height: 60vh; overflow-y: auto;">
-                    <table style="width:100%; border-collapse:collapse; font-size:13px; text-align:left;">
-                        <thead
-                            style="background:#f8fafc; border-bottom:1px solid #e2e8f0; position: sticky; top: 0; z-index: 10;">
-                            <tr>
-                                <th style="padding:15px; width:30%;">POSICIÓN (PLANILLA)</th>
-                                <th style="padding:15px; width:10%;">PAÍS</th>
-                                <th style="padding:15px; width:15%;">EMPRESA</th>
-                                <th style="padding:15px;">DIRECCIÓN</th>
-                                <th style="padding:15px;">DEPARTAMENTO</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tbodyMappings"></tbody>
-                    </table>
+                <div class="card-box" style="padding:0; overflow:hidden;">
+                    <div style="max-height: 60vh; overflow-y: auto;">
+                        <table style="width:100%; border-collapse:collapse; font-size:13px; text-align:left;">
+                            <thead
+                                style="background:#f8fafc; border-bottom:1px solid #e2e8f0; position: sticky; top: 0; z-index: 10;">
+                                <tr>
+                                    <th style="padding:15px; width:30%;">POSICIÓN (PLANILLA)</th>
+                                    <th style="padding:15px; width:10%;">PAÍS</th>
+                                    <th style="padding:15px; width:15%;">EMPRESA</th>
+                                    <th style="padding:15px;">DIRECCIÓN</th>
+                                    <th style="padding:15px;">DEPARTAMENTO</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbodyMappings"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1831,13 +1831,15 @@
             XLSX.writeFile(wb, `Reporte_Costos_${showUSD ? 'USD' : 'Local'}_${yr}_${mo}.xlsx`);
         }
 
-        // Sidebar Resize
+        // Sidebar Resize (Robust check)
         const sidebar = document.getElementById('sidebar');
         const handle = document.getElementById('resizeHandle');
-        let isResizing = false;
-        handle.addEventListener('mousedown', () => { isResizing = true; document.body.style.cursor = 'col-resize'; document.body.style.userSelect = 'none'; });
-        document.addEventListener('mousemove', (e) => { if (!isResizing) return; if (e.clientX >= 180 && e.clientX <= 400) sidebar.style.width = e.clientX + 'px'; });
-        document.addEventListener('mouseup', () => { isResizing = false; document.body.style.cursor = 'default'; document.body.style.userSelect = 'auto'; });
+        if (sidebar && handle) {
+            let isResizing = false;
+            handle.addEventListener('mousedown', () => { isResizing = true; document.body.style.cursor = 'col-resize'; document.body.style.userSelect = 'none'; });
+            document.addEventListener('mousemove', (e) => { if (!isResizing) return; if (e.clientX >= 180 && e.clientX <= 400) sidebar.style.width = e.clientX + 'px'; });
+            document.addEventListener('mouseup', () => { isResizing = false; document.body.style.cursor = 'default'; document.body.style.userSelect = 'auto'; });
+        }
 
         window.onload = () => {
             initFilters();

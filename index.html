@@ -219,6 +219,8 @@
             display: flex;
             flex-direction: column;
             transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            min-width: 0;
+            overflow-x: hidden;
         }
 
         .topbar {
@@ -229,13 +231,26 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 10px 40px;
+            padding: 15px 40px;
             position: sticky;
             top: 0;
-            z-index: 90;
+            z-index: 100;
             color: #fff;
             flex-wrap: wrap;
+            gap: 15px;
             transition: none;
+        }
+
+        @media (max-width: 1200px) {
+            .topbar {
+                justify-content: center;
+                text-align: center;
+            }
+
+            .top-right {
+                justify-content: center;
+                width: 100%;
+            }
         }
 
         .top-left h2 {
@@ -245,10 +260,10 @@
 
         .top-right {
             display: flex;
-            gap: 8px;
-            flex-wrap: nowrap;
-            overflow-x: auto;
-            padding: 5px 0;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            padding: 10px 0;
             -webkit-overflow-scrolling: touch;
         }
 
@@ -329,12 +344,12 @@
             background: rgba(255, 255, 255, 0.08);
             color: #fff;
             border: 1px solid rgba(255, 255, 255, 0.15);
-            padding: 10px 18px;
+            padding: 12px 20px;
             border-radius: 12px;
-            font-size: 11px;
+            font-size: 13px;
             font-weight: 700;
             cursor: pointer;
-            min-width: 140px;
+            min-width: 160px;
             outline: none;
             transition: 0.2s;
         }
@@ -602,6 +617,9 @@
                     <option value="11">Noviembre</option>
                     <option value="12">Diciembre</option>
                 </select>
+                <button onclick="clearFilters()" class="btn-top"
+                    style="background:#475569; box-shadow:none; padding:10px 15px; font-size:11px; display:flex; align-items:center; gap:5px;"><i
+                        class="fas fa-filter-circle-xmark"></i> LIMPIAR</button>
 
             </div>
         </header>
@@ -841,7 +859,15 @@
                         <h2 style="font-size:24px; font-weight:800; color:var(--tx);">Clasificación Maestra</h2>
                         <p style="font-size:12px; color:var(--mu);">Mapeo oficial de Puestos a Áreas y Direcciones</p>
                     </div>
-                    <div class="pane-actions" style="display:flex; gap:10px;">
+                    <div class="pane-actions" style="display:flex; gap:10px; flex-wrap:wrap;">
+                        <select id="paisAdminSel" onchange="renderMappings()" class="admin-select"
+                            style="width:140px; height:42px; border:1px solid #e2e8f0; color:#1e293b; background:#fff;">
+                            <option value="ALL">🌎 Todos los Países</option>
+                        </select>
+                        <select id="empAdminSel" onchange="renderMappings()" class="admin-select"
+                            style="width:140px; height:42px; border:1px solid #e2e8f0; color:#1e293b; background:#fff;">
+                            <option value="ALL">🏢 Todas las Empresas</option>
+                        </select>
                         <button class="btn-top" style="background:#6366f1;" onclick="exportMappings()">📤 Exportar
                             Mapeo</button>
                         <button class="btn-top" style="background:#8b5cf6;"
@@ -1021,7 +1047,18 @@
 
         function renderAll() {
             const filters = getFilters();
-            const filterKey = JSON.stringify(filters) + localStorage.getItem('asys_pos_map_v2');
+            const filterKey = JSON.stringify(filters) +
+                '|usd=' + (window.useUSD || false) +
+                '|search=' + (window.costSearch || '') +
+                '|vac=' + (window.inclVac !== false) +
+                '|ind=' + (window.inclInd !== false) +
+                '|trend=' + (window.showFullYearTrend || false) +
+                '|' + localStorage.getItem('asys_pos_map_v2') +
+                '|' + localStorage.getItem('asys_ui_overrides');
+
+            // Cleanup existing charts
+            activeCharts.forEach(c => { try { c.destroy(); } catch (e) { } });
+            activeCharts = [];
 
             // 1. Get saved mappings
             const mappings = getSavedMappings();
@@ -1036,22 +1073,29 @@
 
                 const empsRaw = app.employees.map(e => {
                     const key = `${(e.p || 'N/A').trim()}|${e.pa || '🌎'}|${e.e || '🏢'}`;
+                    // Always compute auto-mapping as a baseline
+                    const auto = getAutoMapping(e.p);
                     const m = mappings[key];
 
-                    // Intelligent defaults if not mapped
-                    let auto = { dir: '', d: '' };
-                    if (!m) auto = getAutoMapping(e.p);
+                    // Priority: saved mapping > auto-mapping > raw data
+                    const isBad = v => !v || v === '0' || v === 'SIN DEPTO' || v === 'nan' || v === 'N/A' || v === 'PENDIENTE';
 
-                    let dVal = m ? m.d : (auto.d || e.d || '');
-                    let dirVal = m ? m.dir : (auto.dir || e.dir || '');
+                    let dVal = (m && !isBad(m.d)) ? m.d : (!isBad(auto.d) ? auto.d : (e.d || ''));
+                    let dirVal = (m && !isBad(m.dir)) ? m.dir : (!isBad(auto.dir) ? auto.dir : (e.dir || ''));
 
-                    if (!dVal || dVal === '0' || dVal === 'SIN DEPTO' || dVal === 'nan' || dVal === 'N/A') dVal = 'PENDIENTE';
-                    if (!dirVal || dirVal === '0' || dirVal === 'nan' || dirVal === 'N/A') dirVal = 'PENDIENTE';
+                    if (isBad(dVal)) dVal = 'PENDIENTE';
+                    if (isBad(dirVal)) dirVal = 'PENDIENTE';
                     let pVal = (e.p || '').trim();
                     if (!pVal || pVal === '0' || pVal === 'nan' || pVal === 'N/A') pVal = 'PENDIENTE';
 
                     // Standardize xr and tc
-                    const xr = e.xr || e.tr || 1.0;
+                    let xr = parseFloat(e.xr) || parseFloat(e.tr);
+                    // Standard rigid fallbacks for known countries
+                    if (e.pa === 'GT' && (!xr || xr <= 1.1 || isNaN(xr))) xr = 7.66476;
+                    if (e.pa === 'CR' && (!xr || xr <= 1.1 || isNaN(xr))) xr = 600.0;
+                    if (e.pa === 'PY' && (!xr || xr <= 1.1 || isNaN(xr))) xr = 6452.0;
+                    if (!xr || xr <= 0 || isNaN(xr)) xr = 1.0;
+
                     return { ...e, dir: dirVal, d: dVal, p: pVal, xr: xr };
                 });
 
@@ -1091,14 +1135,50 @@
 
 
         function getCurrency() {
-            const p = document.getElementById('paisSel').value;
-            return p !== 'ALL' ? (currencyMap[p] || '$') : '';
+            const p = document.getElementById('paisSel')?.value || 'ALL';
+            if (p === 'ALL') return '';
+            return currencyMap[p] || '$';
         }
+
         function fmtMoney(val) {
-            const c = getCurrency();
-            return c + (val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const showUSD = window.useUSD || false;
+            const c = showUSD ? '$' : getCurrency();
+            const symbol = c ? c + ' ' : '';
+            return symbol + (val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
         const fM = fmtMoney;
+
+        // Global Conversion Helper for Costs (Robust)
+        function getC(val, xr, showUSD, pa) {
+            if (!showUSD) return Number(val) || 0;
+            // Clean xr string if malformed (e.g. 609.74.7444 -> 609.74)
+            let rateStr = String(xr || "");
+            if (rateStr.split('.').length > 2) {
+                const parts = rateStr.split('.');
+                rateStr = parts[0] + '.' + parts[1];
+            }
+            let rate = parseFloat(rateStr);
+
+            // Fallback for GT/CR/PY as requested by user
+            if (pa === 'GT' && (!rate || rate <= 1.1 || isNaN(rate))) rate = 7.66476;
+            if (pa === 'CR' && (!rate || rate <= 1.1 || isNaN(rate))) rate = 600.0;
+            if (pa === 'PY' && (!rate || rate <= 1.1 || isNaN(rate))) rate = 6452.0;
+            if (!rate || rate <= 0 || isNaN(rate)) rate = 1.0;
+
+            // Round first then divide as requested by user for accounting precision
+            return Math.round(Number(val) || 0) / rate;
+        }
+
+        function clearFilters() {
+            if (document.getElementById('paisSel')) document.getElementById('paisSel').value = 'ALL';
+            if (document.getElementById('empresaSel')) document.getElementById('empresaSel').value = 'ALL';
+            if (document.getElementById('areaSel')) document.getElementById('areaSel').value = 'ALL';
+            if (document.getElementById('deptoSel')) document.getElementById('deptoSel').value = 'ALL';
+            if (document.getElementById('yearSel')) document.getElementById('yearSel').value = 'ALL';
+            if (document.getElementById('monthSel')) document.getElementById('monthSel').value = 'ALL';
+            window.costSearch = "";
+            renderAll();
+        }
 
         function updateStatusPhrase(p, e, count) {
             const ptext = p === 'ALL' ? 'todas las regiones' : (paisMap[p] || p);
@@ -1840,7 +1920,7 @@
 
             const showUSD = window.useUSD || false;
             const currency = showUSD ? '$' : getCurrency();
-            const fM = (v) => currency + " " + (v || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+            const fM = (v) => (currency ? currency + ' ' : '') + (v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
             // 1. Filter Logic First
             let filtered = emps;
@@ -1854,60 +1934,99 @@
             }
 
             // 2. Core Totals based on user formula: Ingresos + Provisions + Patronal
-            const tGross = filtered.reduce((a, b) => a + (Number(showUSD ? (b.gusd || b.g / (b.xr || 1)) : (b.g || 0))), 0);
-            const tPat = filtered.reduce((a, b) => a + (Number(showUSD ? (b.p_pat / (b.xr || 1)) : b.p_pat) || 0), 0);
-            const tAgui = filtered.reduce((a, b) => a + (Number(showUSD ? (b.p_agui / (b.xr || 1)) : b.p_agui) || 0), 0);
-            const tB14 = filtered.reduce((a, b) => a + (Number(showUSD ? (b.p_b14 / (b.xr || 1)) : b.p_b14) || 0), 0);
-            const tVac = filtered.reduce((a, b) => a + (Number(showUSD ? (b.p_vac / (b.xr || 1)) : b.p_vac) || 0), 0);
-            const tInd = filtered.reduce((a, b) => a + (Number(showUSD ? (b.p_ind / (b.xr || 1)) : b.p_ind) || 0), 0);
-            const tVar = filtered.reduce((a, b) => a + (Number(showUSD ? (b.bv / (b.xr || 1)) : b.bv) || 0), 0);
+            const tGross = filtered.reduce((a, b) => a + getC(b.g, b.xr, showUSD, b.pa), 0);
+            const tPat = filtered.reduce((a, b) => a + getC(b.p_pat, b.xr, showUSD, b.pa), 0);
+            const tAgui = filtered.reduce((a, b) => a + getC(b.p_agui, b.xr, showUSD, b.pa), 0);
+            const tB14 = filtered.reduce((a, b) => a + getC(b.p_b14, b.xr, showUSD, b.pa), 0);
+            const tVac = filtered.reduce((a, b) => a + getC(b.p_vac, b.xr, showUSD, b.pa), 0);
+            const tInd = filtered.reduce((a, b) => a + getC(b.p_ind, b.xr, showUSD, b.pa), 0);
+            const tVar = filtered.reduce((a, b) => a + getC(b.bv, b.xr, showUSD, b.pa), 0);
 
-            const tProv = tAgui + tB14 + tVac + tInd;
+            const inclVac = window.inclVac !== false;
+            const inclInd = window.inclInd !== false;
+            const tProv = tAgui + tB14 + (inclVac ? tVac : 0) + (inclInd ? tInd : 0);
             const tTotal = tGross + tPat + tProv;
 
-            // 3. Trend Logic (Variable Pay) - Synchronized with all global filters
-            const monthLabels = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-            const varTrend = new Array(12).fill(0);
-            const { p: pais, e: emp, a: area, d: depto, y: yr } = getFilters();
+            // 3. Trend Logic (Variable Pay) - Last 6 or 12 months relative to selected period
+            const fullMonths = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+            const showFullYear = window.showFullYearTrend || false;
+            const spanMonths = showFullYear ? 12 : 6;
+            const { p: pais, e: emp, a: area, d: depto, y: yr, m: mo } = getFilters();
 
+            // Determine anchor: selected month/year or current date
+            let anchorYear = yr !== 'ALL' ? parseInt(yr) : new Date().getFullYear();
+            let anchorMonth = mo !== 'ALL' ? parseInt(mo) : new Date().getMonth() + 1;
+
+            // Build the list of month slots
+            const trendSlots = [];
+            for (let i = spanMonths - 1; i >= 0; i--) {
+                let m2 = anchorMonth - i;
+                let y2 = anchorYear;
+                while (m2 <= 0) { m2 += 12; y2--; }
+                trendSlots.push({ y: y2, m: m2, label: fullMonths[m2 - 1] + ' ' + String(y2).slice(-2) });
+            }
+
+            const varTrend = new Array(spanMonths).fill(0);
             app.employees.forEach(e => {
-                const matchYr = yr === 'ALL' || e.y == yr;
                 const matchPais = pais === 'ALL' || e.pa === pais;
                 const matchEmp = emp === 'ALL' || e.e === emp;
                 const matchArea = area === 'ALL' || e.dir === area;
                 const matchDepto = depto === 'ALL' || e.d === depto;
-
-                if (matchYr && matchPais && matchEmp && matchArea && matchDepto && e.m >= 1 && e.m <= 12) {
-                    varTrend[e.m - 1] += (Number(showUSD ? (e.bv / (e.xr || 1)) : e.bv) || 0);
+                if (!matchPais || !matchEmp || !matchArea || !matchDepto) return;
+                if (window.costSearch) {
+                    const sVal = window.costSearch.toLowerCase();
+                    if (!((e.n || '').toLowerCase().includes(sVal) || (e.p || '').toLowerCase().includes(sVal) || (e.c || '').toLowerCase().includes(sVal))) return;
+                }
+                for (let idx = 0; idx < spanMonths; idx++) {
+                    if (e.y == trendSlots[idx].y && e.m == trendSlots[idx].m) {
+                        varTrend[idx] += getC(e.bv, e.xr, showUSD, e.pa);
+                    }
                 }
             });
+            const trendLabels = trendSlots.map(s => s.label);
 
-            // 4. Update Header and KPIs WITHOUT destroying the whole pane if possible
-            // But since switchTab(5) calls renderCostos, we need to check if we just need an update
-            const needsFullRender = !pane.querySelector('#tbodyCostos') || !pane.querySelector('#costSearch');
+            // 4. Update Header and KPIs - Force re-render if checkboxes or table are missing
+            const needsFullRender = !pane.querySelector('#tbodyCostos') || !pane.querySelector('input[onchange*="inclVac"]');
 
             if (needsFullRender) {
+                const { yr: yr_f, m: mo_f } = getFilters();
+                const periodText = mo_f === 'ALL' ? `Año ${yr_f}` : `${monthNames[mo_f]} ${yr_f}`;
+
                 pane.innerHTML = `
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; background:rgba(255,255,255,0.02); padding:20px 25px; border-radius:15px; border:1px solid rgba(255,255,255,0.05);">
                     <div>
-                        <h2 style="font-size:1.5rem; font-weight:800; color:var(--ac); margin:0;">💰 ANÁLISIS DE COSTOS OPERATIVOS</h2>
-                        <p style="font-size:0.9rem; opacity:0.6; margin:5px 0 0;">Proyección 2025: Ingresos + Provisiones + Carga Patronal</p>
+                        <h2 style="font-size:1.7rem; font-weight:800; color:var(--ac); margin:0;">💰 ANÁLISIS DE COSTOS OPERATIVOS</h2>
+                        <p style="font-size:1rem; opacity:0.6; margin:5px 0 0;">Análisis ${periodText}: Ingresos + Provisiones + Carga Patronal</p>
                     </div>
                     <div style="display:flex; background:#f1f5f9; padding:5px; border-radius:12px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);">
-                        <button onclick="window.useUSD=false; renderAll();" style="border:none; padding:10px 20px; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer; transition:0.3s; background:${!showUSD ? 'var(--ac)' : 'transparent'}; color:${!showUSD ? '#fff' : '#64748b'};">LOCAL</button>
-                        <button onclick="window.useUSD=true; renderAll();" style="border:none; padding:10px 20px; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer; transition:0.3s; background:${showUSD ? 'var(--ac)' : 'transparent'}; color:${showUSD ? '#fff' : '#64748b'};">USD ($)</button>
+                        <button id="btnLocal" onclick="window.useUSD=false; renderAll();" style="border:none; padding:10px 20px; border-radius:8px; font-size:13px; font-weight:800; cursor:pointer; transition:0.3s; background:${!showUSD ? 'var(--ac)' : 'transparent'}; color:${!showUSD ? '#fff' : '#64748b'};">LOCAL</button>
+                        <button id="btnUSD" onclick="window.useUSD=true; renderAll();" style="border:none; padding:10px 20px; border-radius:8px; font-size:13px; font-weight:800; cursor:pointer; transition:0.3s; background:${showUSD ? 'var(--ac)' : 'transparent'}; color:${showUSD ? '#fff' : '#64748b'};">USD ($)</button>
                     </div>
                 </div>
 
-                <div id="kpiCosts" class="kpi-row" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 20px; margin-bottom: 30px;"></div>
+                <div id="kpiCosts" class="kpi-row" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 20px; margin-bottom: 15px;"></div>
+
+                <div style="display:flex; gap:20px; align-items:center; margin-bottom:20px; padding:12px 20px; background:#f8fafc; border-radius:12px; border:1px solid #e2e8f0;">
+                    <label style="display:flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:#475569; cursor:pointer;">
+                        <input type="checkbox" ${window.inclVac !== false ? 'checked' : ''} onchange="window.inclVac=this.checked; renderAll();" style="accent-color:#6366f1; width:16px; height:16px;"> Incluir Vacaciones
+                    </label>
+                    <label style="display:flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:#475569; cursor:pointer;">
+                        <input type="checkbox" ${window.inclInd !== false ? 'checked' : ''} onchange="window.inclInd=this.checked; renderAll();" style="accent-color:#6366f1; width:16px; height:16px;"> Incluir Indemnización
+                    </label>
+                </div>
 
                 <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 25px; margin-bottom: 30px;">
                     <div class="card-box">
-                        <div class="card-title"><h3>Tendencia de Bono Variable</h3><p>Evolución mensual de pagos variables</p></div>
+                        <div class="card-title" style="display:flex; justify-content:space-between; align-items:center;">
+                            <div><h3 style="font-size:16px;">Tendencia de Bono Variable</h3><p>Evolución de pagos variables</p></div>
+                            <label style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:700; color:#475569; cursor:pointer;">
+                                <input type="checkbox" ${window.showFullYearTrend ? 'checked' : ''} onchange="window.showFullYearTrend=this.checked; renderAll();" style="accent-color:#6366f1; width:14px; height:14px;"> Ver último año
+                            </label>
+                        </div>
                         <div style="height: 380px;"><canvas id="chartVarTrend"></canvas></div>
                     </div>
                     <div class="card-box">
-                        <div class="card-title"><h3>Costo por País</h3><p>Distribución de inversión regional</p></div>
+                        <div class="card-title"><h3 style="font-size:16px;">Costo por País</h3><p>Distribución de inversión regional</p></div>
                         <div style="height: 380px;"><canvas id="chartCostPais"></canvas></div>
                     </div>
                 </div>
@@ -1933,7 +2052,7 @@
                             <div class="search-wrapper" style="box-shadow: 0 4px 10px rgba(0,0,0,0.05); border-radius:12px;">
                                 <i class="fas fa-search" style="left: 15px; color: #94a3b8;"></i>
                                 <input type="text" id="costSearch" placeholder="Escriba para buscar: nombre / puesto / código..." 
-                                       style="width: 320px; padding: 12px 15px 12px 45px; border-radius: 12px; border: 1px solid #e2e8f0; font-family: 'Montserrat'; font-size: 12px; outline: none; transition: 0.2s;"
+                                       style="width: 320px; padding: 12px 15px 12px 45px; border-radius: 12px; border: 1px solid #e2e8f0; font-family: 'Montserrat'; font-size: 12px; outline: none; transition: 0.2s; color: #1e293b;"
                                        oninput="applyCostSearch(this.value)" value="${window.costSearch || ''}">
                             </div>
                             <button onclick="exportData()" class="btn-top" style="width:180px; background:var(--gr); border:none; height:42px; border-radius:12px; font-size:11px;">📥 Excel Completo</button>
@@ -1965,11 +2084,29 @@
                 `;
             }
 
+            // Update Period Subtitle if it exists
+            const subTitle = pane.querySelector('p[style*="opacity:0.6"]');
+            if (subTitle) {
+                const { y: yr_u, m: mo_u } = getFilters();
+                const periodText = (mo_u === 'ALL' || !mo_u) ? `Año ${yr_u}` : `${monthNames[mo_u]} ${yr_u}`;
+                subTitle.innerText = `Análisis ${periodText}: Ingresos + Provisiones + Carga Patronal`;
+            }
+
+            // Always update toggle buttons
+            const btnL = document.getElementById('btnLocal');
+            const btnU = document.getElementById('btnUSD');
+            if (btnL && btnU) {
+                btnL.style.background = !showUSD ? 'var(--ac)' : 'transparent';
+                btnL.style.color = !showUSD ? '#fff' : '#64748b';
+                btnU.style.background = showUSD ? 'var(--ac)' : 'transparent';
+                btnU.style.color = showUSD ? '#fff' : '#64748b';
+            }
+
             // Update Dynamic Parts
             document.getElementById('kpiCosts').innerHTML = `
                 ${kpiCard("Total Gasto", fM(tTotal), '<i class="fa-solid fa-money-bill-trend-up"></i>', "#6366f1", "Ingresos + Prov + Pat")}
-                ${kpiCard("Planilla Bruta", fM(tGross), '<i class="fa-solid fa-file-invoice-dollar"></i>', "#3b82f6", "Total Ingresos")}
-                ${kpiCard("Provisiones", fM(tProv), '<i class="fa-solid fa-clock-rotate-left"></i>', "#f59e0b", "Agui+B14+Vac+Ind")}
+                ${kpiCard("Total Salarios", fM(tGross), '<i class="fa-solid fa-file-invoice-dollar"></i>', "#3b82f6", "Total Ingresos")}
+                ${kpiCard("Provisiones", fM(tProv), '<i class="fa-solid fa-clock-rotate-left"></i>', "#f59e0b", "Agui+B14" + (inclVac ? '+Vac' : '') + (inclInd ? '+Ind' : ''))}
                 ${kpiCard("Carga Patronal", fM(tPat), '<i class="fa-solid fa-building-columns"></i>', "#10b981", "Cuotas Patronales")}
                 ${kpiCard("Bono Variable", fM(tVar), '<i class="fa-solid fa-chart-line"></i>', "#ec4899", "Total Variable")}
             `;
@@ -1982,7 +2119,7 @@
             }
 
             tbody.innerHTML = dataLimit.map(e => {
-                const c = (v) => (showUSD ? (v / (e.xr || 1)) : v) || 0;
+                const c = (v) => getC(v, e.xr, showUSD, e.pa);
                 return `
                     <tr style="border-bottom:1px solid #f1f5f9; transition:0.2s;">
                         <td style="padding:12px 15px; color:#64748b; font-weight:600;">${e.c}</td>
@@ -2009,19 +2146,26 @@
             activeCharts.push(new Chart(ctxV, {
                 type: 'line',
                 data: {
-                    labels: monthLabels,
+                    labels: trendLabels,
                     datasets: [{
                         label: 'Variable ' + (showUSD ? '($)' : ''),
                         data: varTrend,
-                        borderColor: '#ec4899', borderWidth: 4, fill: true, backgroundColor: 'rgba(236, 72, 153, 0.1)', tension: 0.4
+                        borderColor: '#ec4899', borderWidth: 4, fill: true, backgroundColor: 'rgba(236, 72, 153, 0.1)', tension: 0.4,
+                        pointRadius: 5, pointBackgroundColor: '#ec4899'
                     }]
                 },
-                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { font: { weight: 700 } } } } }
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { font: { size: 12, weight: 700 } } }, x: { ticks: { font: { size: 11, weight: 700 } } } } }
             }));
 
             // Chart: Cost by Pais
             const costByPais = {};
-            emps.forEach(e => { const p = paisMap[e.pa] || e.pa; costByPais[p] = (costByPais[p] || 0) + (Number(showUSD ? e.tusd : e.tc) || 0); });
+            filtered.forEach(e => {
+                const p = paisMap[e.pa] || e.pa;
+                const base = (Number(e.g) || 0) + (Number(e.p_pat) || 0) + (Number(e.p_agui) || 0) + (Number(e.p_b14) || 0);
+                const extras = (inclVac ? (Number(e.p_vac) || 0) : 0) + (inclInd ? (Number(e.p_ind) || 0) : 0);
+                const cost = getC(base + extras, e.xr, showUSD, e.pa);
+                costByPais[p] = (costByPais[p] || 0) + cost;
+            });
             const sortedPais = Object.entries(costByPais).sort((a, b) => b[1] - a[1]);
             const ctxP = document.getElementById('chartCostPais').getContext('2d');
             activeCharts.push(new Chart(ctxP, {
@@ -2030,12 +2174,18 @@
                     labels: sortedPais.map(d => d[0]),
                     datasets: [{ data: sortedPais.map(d => d[1]), backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'], borderWidth: 0, cutout: '65%' }]
                 },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 8, font: { size: 9 } } } } }
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11, weight: 700 } } } } }
             }));
 
             // Chart: Cost by Dir
             const costByDir = {};
-            emps.forEach(e => { const d = e.dir || 'Sin Clasificar'; costByDir[d] = (costByDir[d] || 0) + (Number(showUSD ? e.tusd : e.tc) || 0); });
+            filtered.forEach(e => {
+                const d = e.dir || 'Sin Clasificar';
+                const base = (Number(e.g) || 0) + (Number(e.p_pat) || 0) + (Number(e.p_agui) || 0) + (Number(e.p_b14) || 0);
+                const extras = (inclVac ? (Number(e.p_vac) || 0) : 0) + (inclInd ? (Number(e.p_ind) || 0) : 0);
+                const cost = getC(base + extras, e.xr, showUSD, e.pa);
+                costByDir[d] = (costByDir[d] || 0) + cost;
+            });
             const sortedDir = Object.entries(costByDir).sort((a, b) => b[1] - a[1]).slice(0, 10);
             const ctxD = document.getElementById('chartCostDir').getContext('2d');
             activeCharts.push(new Chart(ctxD, {
@@ -2044,12 +2194,37 @@
                     labels: sortedDir.map(d => d[0]),
                     datasets: [{ data: sortedDir.map(d => d[1]), backgroundColor: '#6366f1', borderRadius: 10 }]
                 },
-                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+                plugins: [{
+                    id: 'barLabels',
+                    afterDatasetsDraw(chart) {
+                        const { ctx, data } = chart;
+                        ctx.save();
+                        data.datasets.forEach((dataset, i) => {
+                            chart.getDatasetMeta(i).data.forEach((bar, index) => {
+                                const val = dataset.data[index];
+                                const text = val.toLocaleString('en-US', { maximumFractionDigits: 0 });
+                                ctx.font = 'bold 10px Montserrat';
+                                ctx.fillStyle = '#1e293b';
+                                ctx.textAlign = 'left';
+                                ctx.textBaseline = 'middle';
+                                ctx.fillText(text, bar.x + 5, bar.y);
+                            });
+                        });
+                        ctx.restore();
+                    }
+                }],
+                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { ticks: { font: { size: 11, weight: 700 } } }, x: { ticks: { font: { size: 10 } } } } }
             }));
 
             // Chart: Cost by Depto
             const costByDepto = {};
-            emps.forEach(e => { const d = e.d || 'Sin Depto'; costByDepto[d] = (costByDepto[d] || 0) + (Number(showUSD ? e.tusd : e.tc) || 0); });
+            filtered.forEach(e => {
+                const d = e.d || 'Sin Depto';
+                const base = (Number(e.g) || 0) + (Number(e.p_pat) || 0) + (Number(e.p_agui) || 0) + (Number(e.p_b14) || 0);
+                const extras = (inclVac ? (Number(e.p_vac) || 0) : 0) + (inclInd ? (Number(e.p_ind) || 0) : 0);
+                const cost = getC(base + extras, e.xr, showUSD, e.pa);
+                costByDepto[d] = (costByDepto[d] || 0) + cost;
+            });
             const sortedDepto = Object.entries(costByDepto).sort((a, b) => b[1] - a[1]).slice(0, 10);
             const ctxDe = document.getElementById('chartCostDepto').getContext('2d');
             activeCharts.push(new Chart(ctxDe, {
@@ -2058,7 +2233,26 @@
                     labels: sortedDepto.map(d => d[0]),
                     datasets: [{ data: sortedDepto.map(d => d[1]), backgroundColor: '#10b981', borderRadius: 10 }]
                 },
-                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+                plugins: [{
+                    id: 'barLabels',
+                    afterDatasetsDraw(chart) {
+                        const { ctx, data } = chart;
+                        ctx.save();
+                        data.datasets.forEach((dataset, i) => {
+                            chart.getDatasetMeta(i).data.forEach((bar, index) => {
+                                const val = dataset.data[index];
+                                const text = val.toLocaleString('en-US', { maximumFractionDigits: 0 });
+                                ctx.font = 'bold 10px Montserrat';
+                                ctx.fillStyle = '#1e293b';
+                                ctx.textAlign = 'left';
+                                ctx.textBaseline = 'middle';
+                                ctx.fillText(text, bar.x + 5, bar.y);
+                            });
+                        });
+                        ctx.restore();
+                    }
+                }],
+                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { ticks: { font: { size: 11, weight: 700 } } }, x: { ticks: { font: { size: 10 } } } } }
             }));
         }
 
@@ -2130,7 +2324,11 @@
         const ASYS_DEPTOS = ["ACTUARIAL", "ADMINISTRACION", "AJUSTADORES", "ATRACCIÓN DE TALENTO", "AUDITORIA", "BI & ANALYTICS", "BI & OPERACIONES", "BUCA", "CABINA", "CALL CENTER", "CAM NORTE", "CAM SUR", "CAPACITACION", "COMERCIAL", "COMPENSACION Y BENEFICIOS", "COMPLIANCE", "CONTABILIDAD", "CONTRALORÍA", "CONTROL DE CALIDAD", "CULTURA Y COMUNICACIÓN", "DESARROLLO", "DESARROLLO HUMANO", "DESARROLLO ORGANIZACIONAL", "FINANZAS", "GESTIONES", "GURO", "LEGAL", "MEJORA CONTINUA", "MERCADEO", "MUVIT", "OPERACIONES", "PROVEEDORES", "PROYECTOS", "SAC", "SALUD", "SALUD Y SEGURIDAD OCUPACIONAL", "SERVICIOS GENERALES", "SUSCRIPCIÓN", "TELEMARKETING", "TESORERIA", "TI", "WORKFORCE"];
 
         function getSavedMappings() {
-            try { return JSON.parse(localStorage.getItem('asys_pos_map_v2') || '{}'); }
+            try {
+                const master = JSON.parse(localStorage.getItem('asys_pos_map_v2') || '{}');
+                const overrides = JSON.parse(localStorage.getItem('asys_ui_overrides') || '{}');
+                return { ...master, ...overrides };
+            }
             catch (e) { return {}; }
         }
 
@@ -2194,27 +2392,66 @@
             const tbody = document.getElementById('tbodyMappings');
             if (!tbody) return;
 
+            const pA = document.getElementById('paisAdminSel')?.value || 'ALL';
+            const eA = document.getElementById('empAdminSel')?.value || 'ALL';
+
             const keys = new Set();
             const combos = [];
+            const paises = new Set();
+            const empresas = new Set();
+
             app.employees.forEach(e => {
+                if (e.pa) paises.add(e.pa);
+                if (e.e) empresas.add(e.e);
+
                 const p = (e.p || 'N/A').trim();
                 const pa = e.pa || '🌎';
                 const emp = e.e || '🏢';
+
+                if (pA !== 'ALL' && pa !== pA) return;
+                if (eA !== 'ALL' && emp !== eA) return;
+
                 const key = `${p}|${pa}|${emp}`;
                 if (!keys.has(key)) {
                     keys.add(key);
                     combos.push({ p, pa, emp, key, dir: e.dir, d: e.d });
                 }
             });
+
+            // Populate Admin filters once
+            const pSel = document.getElementById('paisAdminSel');
+            const eSel = document.getElementById('empAdminSel');
+            if (pSel && pSel.options.length <= 1) {
+                [...paises].sort().forEach(p => pSel.add(new Option(paisMap[p] || p, p)));
+            }
+            if (eSel && eSel.options.length <= 1) {
+                [...empresas].sort().forEach(e => eSel.add(new Option(e, e)));
+            }
+
             combos.sort((a, b) => a.p.localeCompare(b.p));
+
+            // Get saved mappings to show current state
+            const savedMappings = getSavedMappings();
 
             tbody.innerHTML = combos.map(c => {
                 const safeP = c.p.replace(/'/g, "\\'");
                 const safePa = c.pa.replace(/'/g, "\\'");
                 const safeEmp = c.emp.replace(/'/g, "\\'");
 
-                const dirOptions = ASYS_DIRECCIONES.map(d => `<option value="${d}" ${c.dir === d ? 'selected' : ''}>${d}</option>`).join('');
-                const deptoOptions = ASYS_DEPTOS.map(d => `<option value="${d}" ${c.d === d ? 'selected' : ''}>${d}</option>`).join('');
+                // Resolve current dir/d: saved mapping > auto-mapping > raw data
+                const mapKey = c.key;
+                const saved = savedMappings[mapKey];
+                const auto = getAutoMapping(c.p);
+
+                let curDir = (saved && saved.dir) ? saved.dir : (auto.dir || c.dir || '');
+                let curD = (saved && saved.d) ? saved.d : (auto.d || c.d || '');
+
+                // Normalize bad values
+                if (!curDir || curDir === '0' || curDir === 'nan' || curDir === 'N/A') curDir = 'PENDIENTE';
+                if (!curD || curD === '0' || curD === 'nan' || curD === 'N/A' || curD === 'SIN DEPTO') curD = 'PENDIENTE';
+
+                const dirOptions = ASYS_DIRECCIONES.map(d => `<option value="${d}" ${curDir === d ? 'selected' : ''}>${d}</option>`).join('');
+                const deptoOptions = ASYS_DEPTOS.map(d => `<option value="${d}" ${curD === d ? 'selected' : ''}>${d}</option>`).join('');
 
                 return `
                 <tr style="border-bottom:1px solid #f1f5f9; transition: background 0.2s;" onmouseover="this.style.background='rgba(99,102,241,0.02)'" onmouseout="this.style.background='transparent'">
@@ -2223,13 +2460,13 @@
                     <td style="padding:15px; font-weight:600; color:#64748b; font-size:11px;">${c.emp}</td>
                     <td style="padding:10px;">
                         <select class="admin-select" onchange="updateUIMapping('${safeP}','${safePa}','${safeEmp}', 'dir', this.value)">
-                            <option value="PENDIENTE" ${(!c.dir || c.dir === 'PENDIENTE') ? 'selected' : ''}>-- SELECCIONAR DIRECCIÓN --</option>
+                            <option value="PENDIENTE" ${curDir === 'PENDIENTE' ? 'selected' : ''}>-- SELECCIONAR DIRECCIÓN --</option>
                             ${dirOptions}
                         </select>
                     </td>
                     <td style="padding:10px;">
                         <select class="admin-select" onchange="updateUIMapping('${safeP}','${safePa}','${safeEmp}', 'd', this.value)">
-                            <option value="PENDIENTE" ${(!c.d || c.d === 'PENDIENTE') ? 'selected' : ''}>-- SELECCIONAR DEPTO --</option>
+                            <option value="PENDIENTE" ${curD === 'PENDIENTE' ? 'selected' : ''}>-- SELECCIONAR DEPTO --</option>
                             ${deptoOptions}
                         </select>
                     </td>
@@ -2237,16 +2474,42 @@
             }).join('');
         }
 
-        window.ui_overrides = {};
+        window.ui_overrides = JSON.parse(localStorage.getItem('asys_ui_overrides') || '{}');
         function updateUIMapping(p, pa, e, field, val) {
             const key = `${p}|${pa}|${e}`;
             if (!window.ui_overrides[key]) window.ui_overrides[key] = {};
             window.ui_overrides[key][field] = val.trim();
+            localStorage.setItem('asys_ui_overrides', JSON.stringify(window.ui_overrides));
             console.log("Updated override:", key, field, val);
+
+            // Live apply to app.employees for immediate refresh
+            app.employees.forEach(emp => {
+                if ((emp.p || '').trim().toUpperCase() === p.toUpperCase() && emp.pa === pa && emp.e === e) {
+                    if (field === 'dir') emp.dir = val;
+                    if (field === 'd') emp.d = val;
+                }
+            });
+            renderAll();
         }
 
         function saveMappings() {
-            exportMappingsExcel();
+            // Save all UI overrides to localStorage as the master mapping
+            const allMappings = getSavedMappings();
+            localStorage.setItem('asys_pos_map_v2', JSON.stringify(allMappings));
+            // Clear ui_overrides since they're now merged into master
+            window.ui_overrides = {};
+            localStorage.setItem('asys_ui_overrides', '{}');
+            // Force cache invalidation
+            cachedEmps = null;
+            renderAll();
+            // Visual feedback
+            const btn = document.querySelector('[onclick="saveMappings()"]');
+            if (btn) {
+                const orig = btn.innerHTML;
+                btn.innerHTML = '✅ ¡Guardado!';
+                btn.style.background = '#10b981';
+                setTimeout(() => { btn.innerHTML = orig; btn.style.background = '#22c55e'; }, 2000);
+            }
         }
 
         function exportMappingsExcel() {

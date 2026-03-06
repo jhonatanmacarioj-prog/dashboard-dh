@@ -561,6 +561,10 @@
                 <div class="nav-icon"><i class="fas fa-user-shield"></i></div>
                 <span>Admin: Clasificación</span>
             </div>
+            <div class="nav-item" onclick="switchTab(7)">
+                <div class="nav-icon"><i class="fas fa-file-invoice-dollar"></i></div>
+                <span>Admin: TC</span>
+            </div>
         </nav>
 
         <div
@@ -900,6 +904,58 @@
                     </div>
                 </div>
             </div>
+
+            <div id="pane7" class="pane">
+                <div class="pane-header">
+                    <div>
+                        <h2 style="font-size:24px; font-weight:800; color:var(--tx);">Administración de Tipo de Cambio
+                            (TC)</h2>
+                        <p style="font-size:12px; color:var(--mu);">Gestión de tasas de conversión por País, Empresa y
+                            Periodo</p>
+                    </div>
+                    <div class="pane-actions" style="display:flex; gap:10px; flex-wrap:wrap;">
+                        <select id="paisTCAdminSel" onchange="renderTCMappings()" class="admin-select"
+                            style="width:140px; height:42px; border:1px solid #e2e8f0; color:#1e293b; background:#fff;">
+                            <option value="ALL">🌎 Todos los Países</option>
+                        </select>
+                        <select id="empTCAdminSel" onchange="renderTCMappings()" class="admin-select"
+                            style="width:140px; height:42px; border:1px solid #e2e8f0; color:#1e293b; background:#fff;">
+                            <option value="ALL">🏢 Todas las Empresas</option>
+                        </select>
+                        <button class="btn-top" style="background:#f59e0b;" onclick="loadSuggestedRates()">⚡ Cargar
+                            Tasas Sugeridas</button>
+                        <button class="btn-top" style="background:#6366f1;" onclick="exportTCMappings()">📤 Exportar
+                            TC</button>
+                        <button class="btn-top" style="background:#8b5cf6;"
+                            onclick="document.getElementById('importTCFile').click()">📥 Importar TC</button>
+                        <input type="file" id="importTCFile" style="display:none" onchange="importTCMappings(this)">
+                        <div class="search-wrapper">
+                            <input type="text" placeholder="Buscar periodo/empresa..."
+                                onkeyup="filterTable('tbodyTCMappings', this.value)">
+                            <i class="fas fa-search"></i>
+                        </div>
+                        <button class="btn-top" style="background:#10b981;" onclick="saveTCMappings()">💾 Guardar
+                            Cambios</button>
+                    </div>
+                </div>
+                <div class="card-box" style="padding:0; overflow:hidden;">
+                    <div style="max-height: 60vh; overflow-y: auto;">
+                        <table style="width:100%; border-collapse:collapse; font-size:13px; text-align:left;">
+                            <thead
+                                style="background:#f8fafc; border-bottom:1px solid #e2e8f0; position: sticky; top: 0; z-index: 10;">
+                                <tr>
+                                    <th style="padding:15px; width:15%;">PAÍS</th>
+                                    <th style="padding:15px; width:20%;">EMPRESA</th>
+                                    <th style="padding:15px; width:15%;">AÑO</th>
+                                    <th style="padding:15px; width:15%;">MES</th>
+                                    <th style="padding:15px; width:35%;">VALOR TC (USD)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbodyTCMappings"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <footer class="footer">
@@ -967,13 +1023,14 @@
 
         function switchTab(n) {
             activeTab = n;
-            const titles = ["Headcount (HC)", "Gestión de Plantilla", "Desvinculaciones", "Incidencias de Pago", "Conciliación ISR", "Análisis de Costos", "Panel de Administración"];
+            const titles = ["Headcount (HC)", "Gestión de Plantilla", "Desvinculaciones", "Incidencias de Pago", "Conciliación ISR", "Análisis de Costos", "Panel de Administración", "Administración de Tipos de Cambio"];
             document.getElementById('tabTitle').innerText = titles[n];
             document.querySelectorAll('.nav-item').forEach((it, i) => i === n ? it.classList.add('on') : it.classList.remove('on'));
             document.querySelectorAll('.pane').forEach((p, i) => i === n ? p.classList.add('on') : p.classList.remove('on'));
 
             document.getElementById('monthSel').style.display = (n === 0 || n === 1 || n === 4 || n === 5) ? 'block' : 'none';
             if (n === 6) renderMappings();
+            if (n === 7) renderTCMappings();
             renderAll();
         }
 
@@ -1060,8 +1117,9 @@
             activeCharts.forEach(c => { try { c.destroy(); } catch (e) { } });
             activeCharts = [];
 
-            // 1. Get saved mappings
+            // 1. Get saved mappings and TC
             const mappings = getSavedMappings();
+            const tcMap = JSON.parse(localStorage.getItem('asys_tc_map') || '{}');
 
             // 2. Process data only if filters or mappings changed
             if (cachedEmps && filterKey === lastFilterKey) {
@@ -1090,10 +1148,26 @@
 
                     // Standardize xr and tc
                     let xr = parseFloat(e.xr) || parseFloat(e.tr);
-                    // Standard rigid fallbacks for known countries
-                    if (e.pa === 'GT' && (!xr || xr <= 1.1 || isNaN(xr))) xr = 7.66476;
-                    if (e.pa === 'CR' && (!xr || xr <= 1.1 || isNaN(xr))) xr = 600.0;
-                    if (e.pa === 'PY' && (!xr || xr <= 1.1 || isNaN(xr))) xr = 6452.0;
+
+                    // Priority: Custom TC Map (from localStorage)
+                    const tcKey = `${e.pa}|${e.e}|${e.y}|${e.m}`;
+                    if (tcMap[tcKey] && !isNaN(parseFloat(tcMap[tcKey]))) {
+                        xr = parseFloat(tcMap[tcKey]);
+                    } else {
+                        // Standard rigid fallbacks for known countries if no custom TC or Excel rate
+                        if (!xr || xr <= 1.1 || isNaN(xr)) {
+                            if (e.pa === 'GT') xr = 7.66;
+                            else if (e.pa === 'CR') xr = 600.0;
+                            else if (e.pa === 'HN') xr = 25.25;
+                            else if (e.pa === 'SV') xr = 1.0;
+                            else if (e.pa === 'PA' || e.pa === 'PN') xr = 1.0;
+                            else if (e.pa === 'PY') xr = 7500.0;
+                            else if (e.pa === 'TT') xr = 500.0;
+                            else if (e.pa === 'JM') xr = 500.0;
+                            else if (e.pa === 'NI') xr = 600.0;
+                        }
+                    }
+
                     if (!xr || xr <= 0 || isNaN(xr)) xr = 1.0;
 
                     return { ...e, dir: dirVal, d: dVal, p: pVal, xr: xr };
@@ -1159,10 +1233,18 @@
             }
             let rate = parseFloat(rateStr);
 
-            // Fallback for GT/CR/PY as requested by user
-            if (pa === 'GT' && (!rate || rate <= 1.1 || isNaN(rate))) rate = 7.66476;
-            if (pa === 'CR' && (!rate || rate <= 1.1 || isNaN(rate))) rate = 600.0;
-            if (pa === 'PY' && (!rate || rate <= 1.1 || isNaN(rate))) rate = 6452.0;
+            // Fallback for known countries as requested by user
+            if (!rate || rate <= 1.1 || isNaN(rate)) {
+                if (pa === 'GT') rate = 7.66;
+                else if (pa === 'CR') rate = 600.0;
+                else if (pa === 'HN') rate = 25.25;
+                else if (pa === 'SV') rate = 1.0;
+                else if (pa === 'PA' || pa === 'PN') rate = 1.0;
+                else if (pa === 'PY') rate = 7500.0;
+                else if (pa === 'TT') rate = 500.0;
+                else if (pa === 'JM') rate = 500.0;
+                else if (pa === 'NI') rate = 600.0;
+            }
             if (!rate || rate <= 0 || isNaN(rate)) rate = 1.0;
 
             // Round first then divide as requested by user for accounting precision
@@ -2583,6 +2665,169 @@
                 const text = rows[i].textContent.toLowerCase();
                 rows[i].style.display = text.includes(search) ? '' : 'none';
             }
+        }
+
+        // === TC Admin Master Logic ===
+        window.tc_overrides = {};
+
+        function renderTCMappings() {
+            const tbody = document.getElementById('tbodyTCMappings');
+            if (!tbody) return;
+
+            const pA = document.getElementById('paisTCAdminSel')?.value || 'ALL';
+            const eA = document.getElementById('empTCAdminSel')?.value || 'ALL';
+
+            const keys = new Set();
+            const combos = [];
+            const paises = new Set();
+            const empresas = new Set();
+
+            app.employees.forEach(e => {
+                if (e.pa) paises.add(e.pa);
+                if (e.e) empresas.add(e.e);
+
+                const pa = e.pa || '🌎';
+                const emp = e.e || '🏢';
+                const yr = e.y || '---';
+                const mo = e.m || '---';
+
+                if (pA !== 'ALL' && pa !== pA) return;
+                if (eA !== 'ALL' && emp !== eA) return;
+
+                const key = `${pa}|${emp}|${yr}|${mo}`;
+                if (!keys.has(key)) {
+                    keys.add(key);
+                    combos.push({ pa, emp, yr, mo, key });
+                }
+            });
+
+            // Populate TC Admin filters once
+            const pSel = document.getElementById('paisTCAdminSel');
+            const eSel = document.getElementById('empTCAdminSel');
+            if (pSel && pSel.options.length <= 1) {
+                [...paises].sort().forEach(p => pSel.add(new Option(paisMap[p] || p, p)));
+            }
+            if (eSel && eSel.options.length <= 1) {
+                [...empresas].sort().forEach(e => eSel.add(new Option(e, e)));
+            }
+
+            // Sort by Year desc, Month desc, Country, Company
+            combos.sort((a, b) => {
+                if (b.yr !== a.yr) return b.yr - a.yr;
+                if (b.mo !== a.mo) return b.mo - a.mo;
+                if (a.pa !== b.pa) return a.pa.localeCompare(b.pa);
+                return a.emp.localeCompare(b.emp);
+            });
+
+            const savedTC = JSON.parse(localStorage.getItem('asys_tc_map') || '{}');
+
+            tbody.innerHTML = combos.map(c => {
+                const safePa = c.pa.replace(/'/g, "\\'");
+                const safeEmp = c.emp.replace(/'/g, "\\'");
+                const safeYr = String(c.yr).replace(/'/g, "\\'");
+                const safeMo = String(c.mo).replace(/'/g, "\\'");
+                const key = c.key;
+
+                // Load value: temporary override > saved value > 1.0 (placeholder)
+                const val = (window.tc_overrides[key] !== undefined) ? window.tc_overrides[key] : (savedTC[key] || '');
+
+                return `
+                <tr style="border-bottom:1px solid #f1f5f9; transition: background 0.2s;" onmouseover="this.style.background='rgba(99,102,241,0.02)'" onmouseout="this.style.background='transparent'">
+                    <td style="padding:15px; font-weight:800; color:var(--ac); font-size:11px;">${paisMap[c.pa] || c.pa}</td>
+                    <td style="padding:15px; font-weight:600; color:#1e293b; font-size:11px;">${c.emp}</td>
+                    <td style="padding:15px; font-weight:700; color:#64748b; font-size:11px;">${c.yr}</td>
+                    <td style="padding:15px; font-weight:700; color:#64748b; font-size:11px;">${monthNames[c.mo] || c.mo}</td>
+                    <td style="padding:10px;">
+                        <input type="number" step="0.000001" value="${val}" 
+                            placeholder="Tipo de Cambio (ej. 7.66)"
+                            style="width: 100%; padding: 10px 15px; border-radius: 10px; border: 1px solid #e2e8f0; font-family: 'Montserrat'; font-size: 13px; font-weight: 700; outline: none;"
+                            onchange="updateTCValue('${safePa}','${safeEmp}','${safeYr}','${safeMo}', this.value)">
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        function updateTCValue(pa, e, y, m, val) {
+            const key = `${pa}|${e}|${y}|${m}`;
+            window.tc_overrides[key] = parseFloat(val);
+            console.log("TC Override updated:", key, val);
+        }
+
+        function loadSuggestedRates() {
+            const suggestions = {
+                'GT': 7.66, 'CR': 600, 'HN': 25.25, 'SV': 1, 'PA': 1, 'PN': 1,
+                'TT': 500, 'PY': 7500, 'JM': 500, 'NI': 600
+            };
+
+            const combos = [];
+            app.employees.forEach(e => {
+                const pa = e.pa || '🌎';
+                const emp = e.e || '🏢';
+                const yr = e.y || '---';
+                const mo = e.m || '---';
+                const key = `${pa}|${emp}|${yr}|${mo}`;
+
+                if (suggestions[pa]) {
+                    window.tc_overrides[key] = suggestions[pa];
+                }
+            });
+
+            alert('Tasas sugeridas cargadas para todos los periodos y empresas. Haz clic en "Guardar Cambios" para confirmar.');
+            renderTCMappings();
+        }
+
+        function saveTCMappings() {
+            const savedTC = JSON.parse(localStorage.getItem('asys_tc_map') || '{}');
+            const newTC = { ...savedTC, ...window.tc_overrides };
+
+            // Clean up empty values
+            for (let k in newTC) {
+                if (newTC[k] === "" || isNaN(newTC[k])) delete newTC[k];
+            }
+
+            localStorage.setItem('asys_tc_map', JSON.stringify(newTC));
+            window.tc_overrides = {};
+
+            // Invalidate cache and re-render
+            cachedEmps = null;
+            renderAll();
+
+            // Feedback
+            const btn = document.querySelector('[onclick="saveTCMappings()"]');
+            if (btn) {
+                const orig = btn.innerHTML;
+                btn.innerHTML = '✅ ¡Guardado!';
+                btn.style.background = '#10b981';
+                setTimeout(() => { btn.innerHTML = orig; btn.style.background = '#10b981'; }, 2000);
+            }
+        }
+
+        function exportTCMappings() {
+            const data = localStorage.getItem('asys_tc_map') || '{}';
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `tc_asys_${new Date().toISOString().slice(0, 10)}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function importTCMappings(input) {
+            const file = input.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const json = JSON.parse(e.target.result);
+                    localStorage.setItem('asys_tc_map', JSON.stringify(json));
+                    alert('¡Tipo de Cambio importado con éxito! Recargando dashboard...');
+                    location.reload();
+                } catch (err) {
+                    alert('Error al leer el archivo. Asegúrate de que sea un JSON válido.');
+                }
+            };
+            reader.readAsText(file);
         }
     </script>
 </body>

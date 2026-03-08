@@ -2742,9 +2742,11 @@
                         viewport.insertAdjacentHTML('beforeend', `
                             <div class="map-label-literal" onclick="toggleCountry('${code}')" 
                                  style="position:absolute; top:${pos.top}; left:${pos.left}; z-index:30; transform:translate(calc(-50% + clamp(-15px, ${cal.x}px, 15px)), calc(-50% + clamp(-15px, ${cal.y}px, 15px))); cursor:pointer; pointer-events:auto; transition:0.3s; width:max-content;">
-                                <div style="display:flex; flex-direction:column; align-items:center; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));">
-                                    <span style="font-size: min(10px, 1.5cqw); font-weight:900; color:#475569; text-transform:uppercase; letter-spacing:1px; text-shadow:2px 2px 0 #fff, -2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff;">${pos.name}</span>
-                                    <span style="font-size: min(36px, 4.8cqw); font-weight:900; color:${st.color}; line-height:1; text-shadow:3px 3px 0 #fff, -3px -3px 0 #fff, 3px -3px 0 #fff, -3px 3px 0 #fff, 0 8px 15px rgba(0,0,0,0.15); ${isSelected ? 'transform:scale(1.2);' : ''}">${hc}</span>
+                                <div style="display:flex; flex-direction:column; align-items:center; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));"
+                                     onmouseover="this.style.transform='scale(1.15)';"
+                                     onmouseout="this.style.transform='scale(1)';">
+                                    <span style="font-size: min(12px, 1.8cqw); font-weight:900; color:#1e293b; text-transform:uppercase; letter-spacing:1.5px; text-shadow:2px 2px 0 #fff, -2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff, 0 4px 10px rgba(255,255,255,0.8);">${pos.name}</span>
+                                    <span style="font-size: min(38px, 5cqw); font-weight:900; color:${st.color}; line-height:1; text-shadow:3px 3px 0 #fff, -3px -3px 0 #fff, 3px -3px 0 #fff, -3px 3px 0 #fff, 0 8px 15px rgba(0,0,0,0.25); ${isSelected ? 'transform:scale(1.2);' : ''}">${hc}</span>
                                 </div>
                             </div>
                         `);
@@ -2767,15 +2769,15 @@
 
                         viewport.insertAdjacentHTML('beforeend', `
                             <div style="position:absolute; top:${isl.top}%; left:${isl.left}%; transform:translate(calc(-50% + clamp(-10px, ${cal.x}px, 10px)), calc(-50% + clamp(-10px, ${cal.y}px, 10px))); z-index:35; text-align:center;">
-                                <div style="background:rgba(255,255,255,0.7); backdrop-filter:blur(8px); padding: min(8px, 1.2cqw); border-radius: min(15px, 2.5cqw); border:1px solid #e2e8f0; box-shadow:0 10px 20px rgba(0,0,0,0.08); transition:0.3s;" 
-                                     onmouseover="this.style.transform='scale(1.05) translateY(-5px)'; this.style.boxShadow='0 15px 30px rgba(0,0,0,0.12)';"
-                                     onmouseout="this.style.transform='scale(1) translateY(0)'; this.style.boxShadow='0 10px 20px rgba(0,0,0,0.08)';"
+                                <div style="display:flex; flex-direction:column; align-items:center; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3)); transition:0.3s;" 
+                                     onmouseover="this.style.transform='scale(1.15)';"
+                                     onmouseout="this.style.transform='scale(1)';"
                                      onclick="toggleCountry('${isl.code}')">
-                                    <svg style="width: min(55px, 7.5cqw); height:auto; cursor:pointer;">
-                                        <path d="${isl.shape}" fill="${hc > 0 ? st.color : '#f1f5f9'}" stroke="#fff" stroke-width="2" />
+                                    <svg viewBox="0 0 50 50" style="width: min(50px, 6cqw); height: min(50px, 6cqw); cursor:pointer; margin-bottom: 2px; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.25));">
+                                        <path d="${isl.shape}" fill="${hc > 0 ? st.color : '#cbd5e1'}" stroke="#ffffff" stroke-width="2.5" />
                                     </svg>
-                                    <div style="font-size: min(10px, 1.2cqw); font-weight:900; color:#1e293b; margin-top:2px;">${isl.name.toUpperCase()}</div>
-                                    <div style="font-size: min(20px, 3.5cqw); font-weight:900; color:${st.color}; margin-top:-2px;">${hc}</div>
+                                    <span style="font-size: min(11px, 1.6cqw); font-weight:900; color:#1e293b; text-transform:uppercase; letter-spacing:1.5px; text-shadow:2px 2px 0 #fff, -2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff, 0 4px 10px rgba(255,255,255,0.8);">${isl.name}</span>
+                                    <span style="font-size: min(30px, 4cqw); font-weight:900; color:${st.color}; line-height:1; text-shadow:3px 3px 0 #fff, -3px -3px 0 #fff, 3px -3px 0 #fff, -3px 3px 0 #fff, 0 8px 15px rgba(0,0,0,0.25);">${hc}</span>
                                 </div>
                             </div>
                         `);

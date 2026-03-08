@@ -36,6 +36,17 @@
             --sidebar-tx: #1e293b;
         }
 
+        .map-label-literal {
+            user-select: none;
+            touch-action: none;
+        }
+
+        .map-label-literal:active {
+            cursor: grabbing !important;
+            filter: brightness(1.2);
+        }
+
+
         body.dark {
             --bg: #0f172a;
             --tx: #f8fafc;
@@ -2329,7 +2340,18 @@
             if (activeTab === 3) renderIncidencias();
             if (activeTab === 4) renderISR(filters.p, filters.e, filters.y);
             if (activeTab === 5) renderCostos({}, emps);
+
+            // AUTO DRAW MAP ON INITIAL RENDER (Executive View)
+            const showMap = document.getElementById('toggleMapCheck')?.checked || false;
+            if (showMap && activeTab === 0) {
+                setTimeout(() => {
+                    if (window.googleLoaded && window.google?.visualization?.GeoChart) {
+                        if (typeof drawMap === 'function') drawMap(uniqueEmps);
+                    }
+                }, 500);
+            }
         }
+
 
 
         function getCurrency() {
@@ -2740,11 +2762,11 @@
                         const cal = JSON.parse(localStorage.getItem(`asys_map_cal_${code}`) || '{"x":0, "y":0}');
 
                         viewport.insertAdjacentHTML('beforeend', `
-                            <div class="map-label-literal" onclick="toggleCountry('${code}')" 
-                                 style="position:absolute; top:${pos.top}; left:${pos.left}; z-index:30; transform:translate(calc(-50% + clamp(-15px, ${cal.x}px, 15px)), calc(-50% + clamp(-15px, ${cal.y}px, 15px))); cursor:pointer; pointer-events:auto; transition:0.3s; width:max-content;">
-                                <div style="display:flex; flex-direction:column; align-items:center; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));"
-                                     onmouseover="this.style.transform='scale(1.15)';"
-                                     onmouseout="this.style.transform='scale(1)';">
+                            <div class="map-label-literal" 
+                                 data-code="${code}"
+                                 onmousedown="startMapDrag(event, '${code}')"
+                                 style="position:absolute; top:${pos.top}; left:${pos.left}; z-index:30; transform:translate(calc(-50% + ${cal.x}px), calc(-50% + ${cal.y}px)); cursor:grab; pointer-events:auto; transition:transform 0s; width:max-content; white-space:nowrap;">
+                                <div style="display:flex; flex-direction:column; align-items:center; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3)); pointer-events:none;">
                                     <span style="font-size: min(12px, 1.8cqw); font-weight:900; color:#1e293b; text-transform:uppercase; letter-spacing:1.5px; text-shadow:2px 2px 0 #fff, -2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff, 0 4px 10px rgba(255,255,255,0.8);">${pos.name}</span>
                                     <span style="font-size: min(38px, 5cqw); font-weight:900; color:${st.color}; line-height:1; text-shadow:3px 3px 0 #fff, -3px -3px 0 #fff, 3px -3px 0 #fff, -3px 3px 0 #fff, 0 8px 15px rgba(0,0,0,0.25); ${isSelected ? 'transform:scale(1.2);' : ''}">${hc}</span>
                                 </div>
@@ -2768,12 +2790,12 @@
                         const cal = JSON.parse(localStorage.getItem(`asys_map_cal_${isl.code}`) || '{"x":0, "y":0}');
 
                         viewport.insertAdjacentHTML('beforeend', `
-                            <div style="position:absolute; top:${isl.top}%; left:${isl.left}%; transform:translate(calc(-50% + clamp(-10px, ${cal.x}px, 10px)), calc(-50% + clamp(-10px, ${cal.y}px, 10px))); z-index:35; text-align:center;">
-                                <div style="display:flex; flex-direction:column; align-items:center; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3)); transition:0.3s;" 
-                                     onmouseover="this.style.transform='scale(1.15)';"
-                                     onmouseout="this.style.transform='scale(1)';"
-                                     onclick="toggleCountry('${isl.code}')">
-                                    <svg viewBox="0 0 50 50" style="width: min(50px, 6cqw); height: min(50px, 6cqw); cursor:pointer; margin-bottom: 2px; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.25));">
+                            <div class="map-label-literal" 
+                                 data-code="${isl.code}"
+                                 onmousedown="startMapDrag(event, '${isl.code}')"
+                                 style="position:absolute; top:${isl.top}%; left:${isl.left}%; transform:translate(calc(-50% + ${cal.x}px), calc(-50% + ${cal.y}px)); z-index:35; text-align:center; cursor:grab; transition:transform 0s;">
+                                <div style="display:flex; flex-direction:column; align-items:center; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3)); pointer-events:none;">
+                                    <svg viewBox="0 0 50 50" style="width: min(50px, 6cqw); height: min(50px, 6cqw); margin-bottom: 2px; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.25));">
                                         <path d="${isl.shape}" fill="${hc > 0 ? st.color : '#cbd5e1'}" stroke="#ffffff" stroke-width="2.5" />
                                     </svg>
                                     <span style="font-size: min(11px, 1.6cqw); font-weight:900; color:#1e293b; text-transform:uppercase; letter-spacing:1.5px; text-shadow:2px 2px 0 #fff, -2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff, 0 4px 10px rgba(255,255,255,0.8);">${isl.name}</span>
@@ -2814,7 +2836,40 @@
             const lblBajas = document.getElementById('lblBajasMes');
             if (lblBajas) lblBajas.innerText = '-' + bajasCount;
 
+            // Drag & Drop Map Logic
+            window.startMapDrag = (e, code) => {
+                const el = e.currentTarget;
+                const startX = e.clientX;
+                const startY = e.clientY;
+                const cal = JSON.parse(localStorage.getItem(`asys_map_cal_${code}`) || '{"x":0, "y":0}');
+                const initialX = cal.x;
+                const initialY = cal.y;
+
+                const onMouseMove = (moveEvent) => {
+                    const dx = moveEvent.clientX - startX;
+                    const dy = moveEvent.clientY - startY;
+                    const newX = initialX + dx;
+                    const newY = initialY + dy;
+                    el.style.transform = `translate(calc(-50% + ${newX}px), calc(-50% + ${newY}px))`;
+                    localStorage.setItem(`asys_map_cal_${code}`, JSON.stringify({ x: newX, y: newY }));
+                };
+
+                const onMouseUp = () => {
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                    // Si el movimiento fue mínimo (<5px), disparar toggleCountry para mantener funcionalidad click
+                    const finalCal = JSON.parse(localStorage.getItem(`asys_map_cal_${code}`) || '{"x":0, "y":0}');
+                    if (Math.abs(finalCal.x - initialX) < 5 && Math.abs(finalCal.y - initialY) < 5) {
+                        toggleCountry(code);
+                    }
+                };
+
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+            };
+
             const ctxRes = document.getElementById('chartResumenAB');
+
             if (ctxRes) {
                 activeCharts.push(new Chart(ctxRes.getContext('2d'), {
                     type: 'doughnut',

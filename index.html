@@ -1986,6 +1986,24 @@
             }
         }
 
+        function clearFilters() {
+            // 1. Reset Selects
+            ['paisSel', 'empresaSel', 'areaSel', 'deptoSel', 'yearSel', 'monthSel'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = 'ALL';
+            });
+
+            // 2. Reset Search Inputs
+            document.querySelectorAll('.search-wrapper input').forEach(inp => inp.value = '');
+            window.costSearch = '';
+
+            // 3. Reset Map Selections
+            window.selectedCountries = [];
+
+            // 4. Force global render
+            renderAll();
+        }
+
         function renderSubActives() {
             const { yr, mo, countries } = getFilters();
             const emps = cachedEmps.unique;

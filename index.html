@@ -425,6 +425,21 @@
             width: 80px;
         }
 
+        .sidebar.collapsed .sidebar-footer .footer-logo-box,
+        .sidebar.collapsed .sidebar-footer .footer-text,
+        .sidebar.collapsed .dark-label {
+            display: none !important;
+        }
+
+        .sidebar.collapsed .sidebar-footer {
+            padding: 10px;
+            align-items: center;
+        }
+
+        .sidebar.collapsed .sidebar-footer .menu-item {
+            justify-content: center;
+        }
+
         .main.shrunk {
             margin-left: 80px;
         }
@@ -893,7 +908,7 @@
                 style="width:100%; display:flex; align-items:center; gap:12px; padding:12px; border-radius:12px; border:none; background:transparent; color:var(--tx); cursor:pointer; font-family:var(--ff); transition:0.3s;"
                 title="Modo Oscuro">
                 <i id="darkIcon" class="fas fa-moon" style="font-size:16px; width:20px; text-align:center;"></i>
-                <span style="font-size:13px; font-weight:700;">Modo Oscuro</span>
+                <span class="dark-label" style="font-size:13px; font-weight:700;">Modo Oscuro</span>
             </button>
         </div>
     </div>
@@ -2940,19 +2955,21 @@
             // Multi-country logic initialization
             if (!window.selectedCountries) window.selectedCountries = [];
 
+            // Country counts (shared between grid and radar)
+            const countByPa = {};
+            uniqueEmps.forEach(e => {
+                let code = (e.pa || '').trim().toUpperCase();
+                if (code === 'PN') code = 'PA';
+                if (code === 'DM' || code === 'DO') code = 'RD';
+                countByPa[code] = (countByPa[code] || 0) + 1;
+            });
+
+            const priorityCountries = ['GT', 'CR', 'HN', 'SV', 'NI', 'PA', 'PY', 'JM', 'TT', 'RD'];
+            const overrides = JSON.parse(localStorage.getItem('asys_data_overrides') || '{}');
+
             // Flags grid logic with Fallback to latest available for small countries
             const countryGrid = document.getElementById('countryGrid');
             if (countryGrid) {
-                const countByPa = {};
-                uniqueEmps.forEach(e => {
-                    let code = (e.pa || '').trim().toUpperCase();
-                    if (code === 'PN') code = 'PA';
-                    if (code === 'DM' || code === 'DO') code = 'RD';
-                    countByPa[code] = (countByPa[code] || 0) + 1;
-                });
-
-                const priorityCountries = ['GT', 'CR', 'HN', 'SV', 'NI', 'PA', 'PY', 'JM', 'TT', 'RD'];
-                const overrides = JSON.parse(localStorage.getItem('asys_data_overrides') || '{}');
 
                 // DATA RECOVERY: If a country is 0 in countByPa but has ANY data in empsRaw for the selected year, 
                 // find its LATEST available month and use that HC.

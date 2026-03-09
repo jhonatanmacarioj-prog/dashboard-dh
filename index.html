@@ -1003,7 +1003,7 @@
                                         title="Ver Mapa Operativo">
                                         <i class="fas fa-map-marked-alt"></i> MAPA
                                     </button>
-                                    <input type="checkbox" id="toggleMapCheck" onchange="renderAll()"
+                                    <input type="checkbox" id="toggleMapCheck" checked onchange="renderAll()"
                                         style="display:none;">
                                 </div>
                             </div>
@@ -1028,9 +1028,9 @@
                         </div>
                     </div>
 
-                    <!-- Row 2: Mapa Regional (Hidden or Specific Size) -->
+                    <!-- Row 2: Mapa Regional (Visible by default for 'calidad') -->
                     <div id="mapContainerRow" class="card-box"
-                        style="display:none; padding:0; overflow:hidden; flex-direction:column; background:#fff; height:auto;">
+                        style="display:flex; padding:0; overflow:hidden; flex-direction:column; background:#fff; height:auto; margin-bottom: 30px;">
                         <div style="padding: 20px 25px 8px;">
                             <h3
                                 style="font-size: 11px; font-weight: 800; color: #8b5cf6; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">
@@ -2746,7 +2746,7 @@
         }
 
         function calcTenure(fi) {
-            if (!fi || fi === '0' || fi === 'nan') return 0;
+            if (!fi || typeof fi !== 'string' || fi === '0' || fi === 'nan') return 0;
             try {
                 const now = new Date();
                 let hire;
@@ -2754,6 +2754,7 @@
                     const parts = fi.split('/');
                     if (parts.length < 3) return 0;
                     const d = parseInt(parts[0]), mo = parseInt(parts[1]), yr = parseInt(parts[2]);
+                    if (yr < 100) yr += 2000;
                     hire = new Date(yr, mo - 1, d);
                 } else if (fi.includes('-')) {
                     hire = new Date(fi);
@@ -3074,7 +3075,9 @@
                 });
 
                 const radarLabels = radarCountries.map(c => paisMap[c] || c);
-                const radarData = radarCountries.map(c => countByPaRadar[c]);
+                const rawRadarData = radarCountries.map(c => countByPaRadar[c]);
+                // Visual Scaling: Math.pow(val, 0.45) helps small values (2, 3) stay visible against large (500)
+                const radarData = rawRadarData.map(v => v > 0 ? Math.pow(v, 0.45) : 0);
                 const radarColors = radarCountries.map(c => (countryStyles[c] || countryStyles['OTHER']).color);
 
                 activeCharts.push(new Chart(radarCtx.getContext('2d'), {
@@ -3084,8 +3087,8 @@
                         datasets: [{
                             label: 'Headcount',
                             data: radarData,
-                            backgroundColor: 'rgba(99, 102, 241, 0.15)',
-                            borderColor: '#6366f1',
+                            backgroundColor: 'rgba(139, 92, 246, 0.25)',
+                            borderColor: '#8b5cf6',
                             pointBackgroundColor: radarColors,
                             pointBorderColor: '#fff',
                             pointBorderWidth: 2,
@@ -3097,7 +3100,18 @@
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        plugins: { legend: { display: false } },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: function (context) {
+                                        const index = context.dataIndex;
+                                        const originalValue = rawRadarData[index];
+                                        return `HC: ${originalValue}`;
+                                    }
+                                }
+                            }
+                        },
                         scales: {
                             r: {
                                 beginAtZero: true,
@@ -3164,13 +3178,13 @@
                 if (!finalRegionCounts['CO']) dataTable.addRow([{ v: 'CO', f: 'Paraguay' }, 0]);
 
                 const options = {
-                    region: '419', // Latin America & Caribbean
+                    region: '013', // Focus on Central America as per user reference
                     displayMode: 'regions',
                     resolution: 'countries',
-                    colorAxis: { colors: ['#93c5fd', '#1d4ed8'] }, // Much stronger blue gradient
+                    colorAxis: { colors: ['#c4b5fd', '#8b5cf6'] }, // Lavender to Purple
                     backgroundColor: 'transparent',
-                    datalessRegionColor: '#cbd5e1', // Visible light gray
-                    defaultColor: '#e2e8f0',       // Main landmass color (must be visible!)
+                    datalessRegionColor: '#f8fafc',
+                    defaultColor: '#f8fafc',
                     keepAspectRatio: false,
                     legend: 'none',
                     tooltip: { trigger: 'none' },

@@ -2751,6 +2751,7 @@
 
         function renderGeneral(summ_obj, uniqueEmps, empsRaw) {
             try {
+                let vsText = "";
                 activeCharts.forEach(c => c.destroy());
                 activeCharts = [];
 
@@ -2884,6 +2885,8 @@
                     ).length;
                     prevHC = Math.max(0, prevPayroll - prevBajas);
                     vsText = `${growthLabels[growthPeriod]} (${prevHC})`;
+                } else {
+                    vsText = "vs. Periodo Anterior (0)";
                 }
                 growth = activeHC - prevHC;
 

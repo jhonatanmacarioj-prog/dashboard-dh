@@ -914,7 +914,6 @@
                 style="width:100%; display:flex; align-items:center; gap:12px; padding:12px; border-radius:12px; border:none; background:transparent; color:var(--tx); cursor:pointer; font-family:var(--ff); transition:0.3s;"
                 title="Modo Oscuro">
                 <i id="darkIcon" class="fas fa-moon" style="font-size:16px; width:20px; text-align:center;"></i>
-                <span class="dark-label" style="font-size:13px; font-weight:700;">Modo Oscuro</span>
             </button>
         </div>
     </div>
@@ -1043,8 +1042,8 @@
                         </div>
                     </div>
 
-                    <!-- Row 3: Radar por Área -->
-                    <div style="display: block; margin-bottom: 30px;">
+                    <!-- Row 3: Radar por Área (Hiding redundant duplicate) -->
+                    <div style="display: none; margin-bottom: 30px;">
                         <div class="card-box">
                             <div class="card-title">
                                 <h3>Radar por Dirección</h3>
@@ -2521,145 +2520,150 @@
         let lastFilterKey = "";
 
         function renderAll() {
-            const filters = getFilters();
-            const filterKey = JSON.stringify(filters) +
-                '|usd=' + (window.useUSD || false) +
-                '|search=' + (window.costSearch || '') +
-                '|vac=' + (window.inclVac !== false) +
-                '|ind=' + (window.inclInd !== false) +
-                '|trend=' + (window.showFullYearTrend || false) +
-                '|' + localStorage.getItem('asys_pos_map_v2') +
-                '|' + localStorage.getItem('asys_ui_overrides');
+            try {
+                const filters = getFilters();
+                const filterKey = JSON.stringify(filters) +
+                    '|usd=' + (window.useUSD || false) +
+                    '|search=' + (window.costSearch || '') +
+                    '|vac=' + (window.inclVac !== false) +
+                    '|ind=' + (window.inclInd !== false) +
+                    '|trend=' + (window.showFullYearTrend || false) +
+                    '|' + localStorage.getItem('asys_pos_map_v2') +
+                    '|' + localStorage.getItem('asys_ui_overrides');
 
-            // Cleanup existing charts
-            activeCharts.forEach(c => { try { c.destroy(); } catch (e) { } });
-            activeCharts = [];
+                // Cleanup existing charts
+                activeCharts.forEach(c => { try { c.destroy(); } catch (e) { } });
+                activeCharts = [];
 
-            // Reload Dark Mode on render
-            const savedDark = localStorage.getItem('asys_dark_mode') === 'true';
-            if (savedDark) document.body.classList.add('dark');
-            document.getElementById('darkIcon').className = document.body.classList.contains('dark') ? 'fas fa-sun' : 'fas fa-moon';
+                // Reload Dark Mode on render
+                const savedDark = localStorage.getItem('asys_dark_mode') === 'true';
+                if (savedDark) document.body.classList.add('dark');
+                document.getElementById('darkIcon').className = document.body.classList.contains('dark') ? 'fas fa-sun' : 'fas fa-moon';
 
-            // 1. Get saved mappings and TC
-            const mappings = getSavedMappings();
-            const countryTCMap = JSON.parse(localStorage.getItem('asys_tc_map_v2') || '{}');
+                // 1. Get saved mappings and TC
+                const mappings = getSavedMappings();
+                const countryTCMap = JSON.parse(localStorage.getItem('asys_tc_map_v2') || '{}');
 
-            // 2. Process data only if filters or mappings changed
-            if (cachedEmps && filterKey === lastFilterKey) {
-                // Skip processing if nothing changed
-            } else {
-                activeCharts.forEach(c => { if (c) c.destroy(); }); activeCharts = [];
+                // 2. Process data only if filters or mappings changed
+                if (cachedEmps && filterKey === lastFilterKey) {
+                    // Skip processing if nothing changed
+                } else {
+                    activeCharts.forEach(c => { if (c) c.destroy(); }); activeCharts = [];
 
-                const { p: pais, e: emp, a: area, d: depto, y: yr, m: mo } = filters;
+                    const { p: pais, e: emp, a: area, d: depto, y: yr, m: mo } = filters;
 
-                const mapRecord = (e) => {
-                    const key = `${(e.p || 'N/A').trim()}|${e.pa || '🌎'}|${e.e || '🏢'}`;
-                    const auto = getAutoMapping(e.p);
-                    const m = mappings[key];
-                    const isBad = v => !v || v === '0' || v === 'SIN DEPTO' || v === 'nan' || v === 'N/A' || v === 'PENDIENTE';
+                    const mapRecord = (e) => {
+                        const key = `${(e.p || 'N/A').trim()}|${e.pa || '🌎'}|${e.e || '🏢'}`;
+                        const auto = getAutoMapping(e.p);
+                        const m = mappings[key];
+                        const isBad = v => !v || v === '0' || v === 'SIN DEPTO' || v === 'nan' || v === 'N/A' || v === 'PENDIENTE';
 
-                    let dVal = (m && !isBad(m.d)) ? m.d : (!isBad(auto.d) ? auto.d : (e.d || ''));
-                    let dirVal = (m && !isBad(m.dir)) ? m.dir : (!isBad(auto.dir) ? auto.dir : (e.dir || ''));
+                        let dVal = (m && !isBad(m.d)) ? m.d : (!isBad(auto.d) ? auto.d : (e.d || ''));
+                        let dirVal = (m && !isBad(m.dir)) ? m.dir : (!isBad(auto.dir) ? auto.dir : (e.dir || ''));
 
-                    if (isBad(dVal)) dVal = 'PENDIENTE';
-                    if (isBad(dirVal)) dirVal = 'PENDIENTE';
+                        if (isBad(dVal)) dVal = 'PENDIENTE';
+                        if (isBad(dirVal)) dirVal = 'PENDIENTE';
 
-                    let pVal = (e.p || '').trim();
-                    if (!pVal || pVal === '0' || pVal === 'nan' || pVal === 'N/A') pVal = 'PENDIENTE';
+                        let pVal = (e.p || '').trim();
+                        if (!pVal || pVal === '0' || pVal === 'nan' || pVal === 'N/A') pVal = 'PENDIENTE';
 
-                    let xr = parseFloat(e.xr) || parseFloat(e.tr);
-                    const tcKey = `${e.pa}|${e.y}|${e.m}`;
-                    if (countryTCMap[tcKey] && !isNaN(parseFloat(countryTCMap[tcKey]))) {
-                        xr = parseFloat(countryTCMap[tcKey]);
-                    } else {
-                        if (e.pa === 'GT') xr = 7.66476;
-                        else if (e.pa === 'CR') xr = 508.45;
-                        else if (e.pa === 'PY') xr = 7860.00;
-                        else if (e.pa === 'NI') xr = 36.6243;
-                        else if (e.pa === 'HN') xr = 24.50;
-                        else if (e.pa === 'RD' || e.pa === 'DO' || e.pa === 'DM') xr = 58.50; // RD fixed fallback
-                        else if (e.pa === 'JM') xr = 155.00;
-                        else if (e.pa === 'TT') xr = 6.78;
-                        else if (e.pa === 'PA' || e.pa === 'PN' || e.pa === 'SV') xr = 1.0;
-                    }
-                    if (!xr || xr <= 0 || isNaN(xr)) xr = 1.0;
+                        let xr = parseFloat(e.xr) || parseFloat(e.tr);
+                        const tcKey = `${e.pa}|${e.y}|${e.m}`;
+                        if (countryTCMap[tcKey] && !isNaN(parseFloat(countryTCMap[tcKey]))) {
+                            xr = parseFloat(countryTCMap[tcKey]);
+                        } else {
+                            if (e.pa === 'GT') xr = 7.66476;
+                            else if (e.pa === 'CR') xr = 508.45;
+                            else if (e.pa === 'PY') xr = 7860.00;
+                            else if (e.pa === 'NI') xr = 36.6243;
+                            else if (e.pa === 'HN') xr = 24.50;
+                            else if (e.pa === 'RD' || e.pa === 'DO' || e.pa === 'DM') xr = 58.50; // RD fixed fallback
+                            else if (e.pa === 'JM') xr = 155.00;
+                            else if (e.pa === 'TT') xr = 6.78;
+                            else if (e.pa === 'PA' || e.pa === 'PN' || e.pa === 'SV') xr = 1.0;
+                        }
+                        if (!xr || xr <= 0 || isNaN(xr)) xr = 1.0;
 
-                    return { ...e, dir: dirVal, d: dVal, p: pVal, xr: xr };
-                };
+                        return { ...e, dir: dirVal, d: dVal, p: pVal, xr: xr };
+                    };
 
-                const empsRaw = app.employees.map(mapRecord);
-                const bajasRaw = (app.bajas_list || []).map(mapRecord);
-                window.allBajasMapped = bajasRaw;
+                    const empsRaw = app.employees.map(mapRecord);
+                    const bajasRaw = (app.bajas_list || []).map(mapRecord);
+                    window.allBajasMapped = bajasRaw;
 
-                const emps = empsRaw.filter(e => {
-                    const curPa = (e.pa || '').trim().toUpperCase();
-                    const matchPa = (window.selectedCountries && window.selectedCountries.length > 0)
-                        ? window.selectedCountries.includes(curPa)
-                        : (pais === 'ALL' ? true : curPa === pais);
-                    return matchPa &&
-                        (emp === 'ALL' ? true : e.e === emp) &&
-                        (area === 'ALL' ? true : e.dir === area) &&
-                        (depto === 'ALL' || e.d === depto || e.depto === depto) &&
-                        (yr === 'ALL' ? true : e.y == yr) &&
-                        (mo === 'ALL' ? true : e.m == mo);
-                });
+                    const emps = empsRaw.filter(e => {
+                        const curPa = (e.pa || '').trim().toUpperCase();
+                        const matchPa = (window.selectedCountries && window.selectedCountries.length > 0)
+                            ? window.selectedCountries.includes(curPa)
+                            : (pais === 'ALL' ? true : curPa === pais);
+                        return matchPa &&
+                            (emp === 'ALL' ? true : e.e === emp) &&
+                            (area === 'ALL' ? true : e.dir === area) &&
+                            (depto === 'ALL' || e.d === depto || e.depto === depto) &&
+                            (yr === 'ALL' ? true : e.y == yr) &&
+                            (mo === 'ALL' ? true : e.m == mo);
+                    });
 
-                const sortedByTime = [...emps].sort((a, b) => (Number(a.y) - Number(b.y)) || (Number(a.m) - Number(b.m)));
-                const seenById = new Map();
-                sortedByTime.forEach(e => {
-                    const code = String(e.c || '').trim().toUpperCase();
-                    const name = String(e.n || '').trim().toUpperCase();
-                    const personId = (code && code !== 'N/A' && code !== 'NAN' && code !== '0') ? code : name;
+                    const sortedByTime = [...emps].sort((a, b) => (Number(a.y) - Number(b.y)) || (Number(a.m) - Number(b.m)));
+                    const seenById = new Map();
+                    sortedByTime.forEach(e => {
+                        const code = String(e.c || '').trim().toUpperCase();
+                        const name = String(e.n || '').trim().toUpperCase();
+                        const personId = (code && code !== 'N/A' && code !== 'NAN' && code !== '0') ? code : name;
 
-                    if (personId && personId !== 'UNKNOWN' && personId !== 'PENDIENTE' && personId !== '') {
-                        seenById.set(personId, e);
-                    }
-                });
-                cachedEmps = { unique: [...seenById.values()], raw: emps, allRaw: empsRaw, bajas: bajasRaw };
-                lastFilterKey = filterKey;
-            }
-
-            const { unique: uniqueEmps, raw: emps, allRaw: empsRaw, bajas: bajasMapped } = cachedEmps;
-            window.allBajas = bajasMapped;
-
-            // 2. ALTAS/TENURE Helper (needed for renderExecutiveCharts)
-            const hiresSet = new Set();
-            uniqueEmps.forEach(item => {
-                if (!item.fi) return;
-                const fparts = item.fi.split('/');
-                if (fparts.length < 3) return;
-                const fy = parseInt(fparts[2]);
-                const fm = parseInt(fparts[1]);
-                if ((filters.y === 'ALL' || fy == parseInt(filters.y)) && (filters.m === 'ALL' || fm == parseInt(filters.m))) {
-                    hiresSet.add(item.c || item.n);
+                        if (personId && personId !== 'UNKNOWN' && personId !== 'PENDIENTE' && personId !== '') {
+                            seenById.set(personId, e);
+                        }
+                    });
+                    cachedEmps = { unique: [...seenById.values()], raw: emps, allRaw: empsRaw, bajas: bajasRaw };
+                    lastFilterKey = filterKey;
                 }
-            });
-            const tenures = uniqueEmps.map(e => e.t || 0);
 
-            // 5. Update Footer & Status
-            document.getElementById('hcDisp').innerText = uniqueEmps.length.toLocaleString();
-            document.getElementById('lastUpdateDisp').innerText = app.updated || '---';
-            updateStatusPhrase(filters.p, filters.e, uniqueEmps.length);
+                const { unique: uniqueEmps, raw: emps, allRaw: empsRaw, bajas: bajasMapped } = cachedEmps;
+                window.allBajas = bajasMapped;
 
-            // 6. Route to active tab renderer
-            if (activeTab === 0) {
-                renderGeneral({}, uniqueEmps, empsRaw);
-            }
-            if (activeTab === 1) renderPlantilla(uniqueEmps, empsRaw);
-            if (activeTab === 2) renderBajas();
-            if (activeTab === 3) renderIncidencias();
-            if (activeTab === 4) renderISR(filters.p, filters.e, filters.y);
-            if (activeTab === 5) renderCostos({}, emps);
-
-            // AUTO DRAW MAP ON INITIAL RENDER (Executive View)
-            const showMap = document.getElementById('toggleMapCheck')?.checked || false;
-            if (showMap && activeTab === 0) {
-                setTimeout(() => {
-                    if (window.googleLoaded && window.google?.visualization?.GeoChart) {
-                        if (typeof drawMap === 'function') drawMap(uniqueEmps);
+                // 2. ALTAS/TENURE Helper (needed for renderExecutiveCharts)
+                const hiresSet = new Set();
+                uniqueEmps.forEach(item => {
+                    if (!item.fi) return;
+                    const fparts = item.fi.split('/');
+                    if (fparts.length < 3) return;
+                    const fy = parseInt(fparts[2]);
+                    const fm = parseInt(fparts[1]);
+                    if ((filters.y === 'ALL' || fy == parseInt(filters.y)) && (filters.m === 'ALL' || fm == parseInt(filters.m))) {
+                        hiresSet.add(item.c || item.n);
                     }
-                }, 500);
-            }
+                });
+                const tenures = uniqueEmps.map(e => e.t || 0);
+
+                // 5. Update Footer & Status
+                const hcEl = document.getElementById('hcDisp');
+                if (hcEl) hcEl.innerText = uniqueEmps.length.toLocaleString();
+                const luEl = document.getElementById('lastUpdateDisp');
+                if (luEl) luEl.innerText = app.updated || '---';
+                updateStatusPhrase(filters.p, filters.e, uniqueEmps.length);
+
+                // 6. Route to active tab renderer
+                if (activeTab === 0) {
+                    renderGeneral({}, uniqueEmps, empsRaw);
+                }
+                if (activeTab === 1) renderPlantilla(uniqueEmps, empsRaw);
+                if (activeTab === 2) renderBajas();
+                if (activeTab === 3) renderIncidencias();
+                if (activeTab === 4) renderISR(filters.p, filters.e, filters.y);
+                if (activeTab === 5) renderCostos({}, emps);
+
+                // AUTO DRAW MAP ON INITIAL RENDER (Executive View)
+                const showMap = document.getElementById('toggleMapCheck')?.checked || false;
+                if (showMap && activeTab === 0) {
+                    setTimeout(() => {
+                        if (window.googleLoaded && window.google?.visualization?.GeoChart) {
+                            if (typeof drawMap === 'function') drawMap(uniqueEmps);
+                        }
+                    }, 500);
+                }
+            } catch (err) { console.error('❌ renderAll ERROR:', err); }
+            console.log('✅ Dashboard Render Complete');
         }
 
 
@@ -2746,160 +2750,161 @@
         }
 
         function renderGeneral(summ_obj, uniqueEmps, empsRaw) {
-            activeCharts.forEach(c => c.destroy());
-            activeCharts = [];
+            try {
+                activeCharts.forEach(c => c.destroy());
+                activeCharts = [];
 
-            const y = document.getElementById('yearSel').value;
-            const m = document.getElementById('monthSel').value;
-            const monthNames = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+                const y = document.getElementById('yearSel').value;
+                const m = document.getElementById('monthSel').value;
+                const monthNames = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
-            const pais2 = document.getElementById('paisSel').value;
-            const emp2 = document.getElementById('empresaSel').value;
-            const areaSel = document.getElementById('areaSel')?.value || 'ALL';
-            const deptoSel = document.getElementById('deptoSel')?.value || 'ALL';
+                const pais2 = document.getElementById('paisSel').value;
+                const emp2 = document.getElementById('empresaSel').value;
+                const areaSel = document.getElementById('areaSel')?.value || 'ALL';
+                const deptoSel = document.getElementById('deptoSel')?.value || 'ALL';
 
-            const allBajas = app.bajas_list || [];
+                const allBajas = app.bajas_list || [];
 
-            // 1. ALTAS (Hires for selected period + Cumulative YTD)
-            const hiresSet = new Set();
-            uniqueEmps.forEach(item => {
-                if (!item.fi) return;
-                const fparts = item.fi.split('/');
-                if (fparts.length < 3) return;
-                const fy = parseInt(fparts[2]);
-                const fm = parseInt(fparts[1]);
-                if ((y === 'ALL' || fy == parseInt(y)) && (m === 'ALL' || fm == parseInt(m))) {
-                    hiresSet.add(item.c || item.n);
-                }
-            });
-            let hiresPeriod = hiresSet.size;
-
-            let hiresYTD = 0;
-            if (y !== 'ALL') {
-                const targetM = (m === 'ALL') ? 12 : parseInt(m);
-                const hiresYTDSet = new Set();
-                empsRaw.forEach(e => {
-                    if (!e.fi) return;
-                    const fp = e.fi.split('/');
-                    if (fp.length < 3) return;
-                    const fy = parseInt(fp[2]), fm = parseInt(fp[1]);
-                    if (fy == parseInt(y) && fm <= targetM &&
-                        (pais2 === 'ALL' || e.pa === pais2) && (emp2 === 'ALL' || e.e === emp2) &&
-                        (areaSel === 'ALL' || e.dir === areaSel || e.area === areaSel) &&
-                        (deptoSel === 'ALL' || e.d === deptoSel || e.depto === deptoSel)) {
-                        hiresYTDSet.add(e.c || e.n);
+                // 1. ALTAS (Hires for selected period + Cumulative YTD)
+                const hiresSet = new Set();
+                uniqueEmps.forEach(item => {
+                    if (!item.fi) return;
+                    const fparts = item.fi.split('/');
+                    if (fparts.length < 3) return;
+                    const fy = parseInt(fparts[2]);
+                    const fm = parseInt(fparts[1]);
+                    if ((y === 'ALL' || fy == parseInt(y)) && (m === 'ALL' || fm == parseInt(m))) {
+                        hiresSet.add(item.c || item.n);
                     }
                 });
-                hiresYTD = hiresYTDSet.size;
-            }
+                let hiresPeriod = hiresSet.size;
 
-            // 2. BAJAS (Bajas for selected period + Cumulative YTD)
-            const filteredBajas = (window.allBajas || []).filter(b => {
-                const matchP = pais2 === 'ALL' || b.pa === pais2;
-                const matchE = emp2 === 'ALL' || b.e === emp2;
-                const matchA = areaSel === 'ALL' || b.dir === areaSel;
-                const matchD = deptoSel === 'ALL' || b.d === deptoSel;
-                let matchDate = (y === 'ALL' || b.y == y) && (m === 'ALL' || b.m == m);
-                return matchP && matchE && matchA && matchD && matchDate;
-            });
-            let bajasPeriod = filteredBajas.length;
+                let hiresYTD = 0;
+                if (y !== 'ALL') {
+                    const targetM = (m === 'ALL') ? 12 : parseInt(m);
+                    const hiresYTDSet = new Set();
+                    empsRaw.forEach(e => {
+                        if (!e.fi) return;
+                        const fp = e.fi.split('/');
+                        if (fp.length < 3) return;
+                        const fy = parseInt(fp[2]), fm = parseInt(fp[1]);
+                        if (fy == parseInt(y) && fm <= targetM &&
+                            (pais2 === 'ALL' || e.pa === pais2) && (emp2 === 'ALL' || e.e === emp2) &&
+                            (areaSel === 'ALL' || e.dir === areaSel || e.area === areaSel) &&
+                            (deptoSel === 'ALL' || e.d === deptoSel || e.depto === deptoSel)) {
+                            hiresYTDSet.add(e.c || e.n);
+                        }
+                    });
+                    hiresYTD = hiresYTDSet.size;
+                }
 
-            let bajasYTD = 0;
-            if (y !== 'ALL') {
-                const targetM = (m === 'ALL') ? 12 : parseInt(m);
-                bajasYTD = allBajas.filter(b => {
+                // 2. BAJAS (Bajas for selected period + Cumulative YTD)
+                const filteredBajas = (window.allBajas || []).filter(b => {
                     const matchP = pais2 === 'ALL' || b.pa === pais2;
                     const matchE = emp2 === 'ALL' || b.e === emp2;
-                    const matchA = areaSel === 'ALL' || b.dir === areaSel || b.area === areaSel;
-                    const matchD = deptoSel === 'ALL' || b.d === deptoSel || b.depto === deptoSel;
-                    return matchP && matchE && matchA && matchD && b.y == y && b.m <= targetM;
-                }).length;
-            }
+                    const matchA = areaSel === 'ALL' || b.dir === areaSel;
+                    const matchD = deptoSel === 'ALL' || b.d === deptoSel;
+                    let matchDate = (y === 'ALL' || b.y == y) && (m === 'ALL' || b.m == m);
+                    return matchP && matchE && matchA && matchD && matchDate;
+                });
+                let bajasPeriod = filteredBajas.length;
 
-            // 3. HC ACTIVO REAL (Payroll - Bajas del mes)
-            let activeHC = uniqueEmps.length;
-            if (m === 'ALL' && uniqueEmps.length > 0 && y !== 'ALL') {
-                const monthsInView = [...new Set(empsRaw.filter(e =>
-                    (pais2 === 'ALL' || e.pa === pais2) && (emp2 === 'ALL' || e.e === emp2) && (e.y == y)
-                ).map(e => e.m))].sort((a, b) => b - a);
-                if (monthsInView.length > 0) {
-                    const lastM = monthsInView[0];
-                    activeHC = new Set(empsRaw.filter(e =>
-                        (pais2 === 'ALL' || e.pa === pais2) && (emp2 === 'ALL' || e.e === emp2) && e.y == y && e.m == lastM
+                let bajasYTD = 0;
+                if (y !== 'ALL') {
+                    const targetM = (m === 'ALL') ? 12 : parseInt(m);
+                    bajasYTD = allBajas.filter(b => {
+                        const matchP = pais2 === 'ALL' || b.pa === pais2;
+                        const matchE = emp2 === 'ALL' || b.e === emp2;
+                        const matchA = areaSel === 'ALL' || b.dir === areaSel || b.area === areaSel;
+                        const matchD = deptoSel === 'ALL' || b.d === deptoSel || b.depto === deptoSel;
+                        return matchP && matchE && matchA && matchD && b.y == y && b.m <= targetM;
+                    }).length;
+                }
+
+                // 3. HC ACTIVO REAL (Payroll - Bajas del mes)
+                let activeHC = uniqueEmps.length;
+                if (m === 'ALL' && uniqueEmps.length > 0 && y !== 'ALL') {
+                    const monthsInView = [...new Set(empsRaw.filter(e =>
+                        (pais2 === 'ALL' || e.pa === pais2) && (emp2 === 'ALL' || e.e === emp2) && (e.y == y)
+                    ).map(e => e.m))].sort((a, b) => b - a);
+                    if (monthsInView.length > 0) {
+                        const lastM = monthsInView[0];
+                        activeHC = new Set(empsRaw.filter(e =>
+                            (pais2 === 'ALL' || e.pa === pais2) && (emp2 === 'ALL' || e.e === emp2) && e.y == y && e.m == lastM
+                        ).map(e => e.c || e.n)).size;
+                    }
+                }
+                // Restar bajas del mes si hay un mes seleccionado
+                if (m !== 'ALL') activeHC = Math.max(0, activeHC - bajasPeriod);
+
+                // --- APLY MANUAL OVERRIDES (PRIORITY) ---
+                const overrides = JSON.parse(localStorage.getItem('asys_data_overrides') || '{}');
+                const ovrKey = `${pais2}_${emp2}_${y}_${m}`;
+                if (overrides[ovrKey]) {
+                    const o = overrides[ovrKey];
+                    if (o.hc !== null) activeHC = o.hc;
+                    if (o.altas !== null) hiresPeriod = o.altas;
+                    if (o.bajas !== null) bajasPeriod = o.bajas;
+                }
+
+                // 4. CRECIMIENTO COMPARATIVO
+                // Growth Period Logic (Default 1m)
+                let growthPeriod = window.selectedGrowthPeriod || '1m';
+                if (m === 'ALL' && growthPeriod === '1m') growthPeriod = '1y';
+
+                const growthLabels = { '1m': 'vs. Mes Anterior', '3m': 'vs. Últimos 3 Meses', '1y': 'vs. Año Pasado' };
+
+                let prevHC = 0;
+                if (y !== 'ALL') {
+                    const curM = (m === 'ALL') ? 12 : parseInt(m);
+                    const curY = parseInt(y);
+                    let targetM, targetY;
+
+                    if (growthPeriod === '1m') {
+                        targetM = curM === 1 ? 12 : curM - 1;
+                        targetY = curM === 1 ? curY - 1 : curY;
+                    } else if (growthPeriod === '3m') {
+                        targetM = curM - 3;
+                        targetY = curY;
+                        if (targetM <= 0) { targetM += 12; targetY--; }
+                    } else {
+                        targetM = curM;
+                        targetY = curY - 1;
+                    }
+
+                    const prevPayroll = new Set(empsRaw.filter(e => e.y == targetY && e.m == targetM &&
+                        (pais2 === 'ALL' || e.pa === pais2) && (emp2 === 'ALL' || e.e === emp2) &&
+                        (areaSel === 'ALL' || e.dir === areaSel || e.area === areaSel) &&
+                        (deptoSel === 'ALL' || e.d === deptoSel || e.depto === deptoSel)
                     ).map(e => e.c || e.n)).size;
+                    const prevBajas = allBajas.filter(b => b.y == targetY && b.m == targetM &&
+                        (pais2 === 'ALL' || b.pa === pais2) && (emp2 === 'ALL' || b.e === emp2) &&
+                        (areaSel === 'ALL' || b.dir === areaSel || b.area === areaSel) &&
+                        (deptoSel === 'ALL' || b.d === deptoSel || b.depto === deptoSel)
+                    ).length;
+                    prevHC = Math.max(0, prevPayroll - prevBajas);
+                    vsText = `${growthLabels[growthPeriod]} (${prevHC})`;
                 }
-            }
-            // Restar bajas del mes si hay un mes seleccionado
-            if (m !== 'ALL') activeHC = Math.max(0, activeHC - bajasPeriod);
+                growth = activeHC - prevHC;
 
-            // --- APLY MANUAL OVERRIDES (PRIORITY) ---
-            const overrides = JSON.parse(localStorage.getItem('asys_data_overrides') || '{}');
-            const ovrKey = `${pais2}_${emp2}_${y}_${m}`;
-            if (overrides[ovrKey]) {
-                const o = overrides[ovrKey];
-                if (o.hc !== null) activeHC = o.hc;
-                if (o.altas !== null) hiresPeriod = o.altas;
-                if (o.bajas !== null) bajasPeriod = o.bajas;
-            }
+                const growthStatus = growth >= 0 ? "up" : "down";
+                const growthVal = isNaN(growth) ? '---' : (growth >= 0 ? `▲ +${growth}` : `▼ ${Math.abs(growth)}`);
 
-            // 4. CRECIMIENTO COMPARATIVO
-            // Growth Period Logic (Default 1m)
-            let growthPeriod = window.selectedGrowthPeriod || '1m';
-            if (m === 'ALL' && growthPeriod === '1m') growthPeriod = '1y';
+                // ACTIVE COUNTRIES: Count all that have data in the selected YEAR if period is ALL
+                const paisesSet = new Set();
+                (m === 'ALL' ? empsRaw : uniqueEmps).forEach(e => {
+                    let code = (e.pa || '').trim().toUpperCase();
+                    if (code === 'PN') code = 'PA';
+                    if (code === 'DM' || code === 'DO') code = 'RD';
+                    if (code && code !== 'NAT' && code !== 'PAIS') paisesSet.add(code);
+                });
+                const paisesSize = paisesSet.size;
 
-            const growthLabels = { '1m': 'vs. Mes Anterior', '3m': 'vs. Últimos 3 Meses', '1y': 'vs. Año Pasado' };
+                let activeColor = "#8b5cf6";
+                if (paisesSize === 1 && uniqueEmps.length > 0) activeColor = getStyle(uniqueEmps[0].pa).color;
 
-            let prevHC = 0;
-            if (y !== 'ALL') {
-                const curM = (m === 'ALL') ? 12 : parseInt(m);
-                const curY = parseInt(y);
-                let targetM, targetY;
-
-                if (growthPeriod === '1m') {
-                    targetM = curM === 1 ? 12 : curM - 1;
-                    targetY = curM === 1 ? curY - 1 : curY;
-                } else if (growthPeriod === '3m') {
-                    targetM = curM - 3;
-                    targetY = curY;
-                    if (targetM <= 0) { targetM += 12; targetY--; }
-                } else {
-                    targetM = curM;
-                    targetY = curY - 1;
-                }
-
-                const prevPayroll = new Set(empsRaw.filter(e => e.y == targetY && e.m == targetM &&
-                    (pais2 === 'ALL' || e.pa === pais2) && (emp2 === 'ALL' || e.e === emp2) &&
-                    (areaSel === 'ALL' || e.dir === areaSel || e.area === areaSel) &&
-                    (deptoSel === 'ALL' || e.d === deptoSel || e.depto === deptoSel)
-                ).map(e => e.c || e.n)).size;
-                const prevBajas = allBajas.filter(b => b.y == targetY && b.m == targetM &&
-                    (pais2 === 'ALL' || b.pa === pais2) && (emp2 === 'ALL' || b.e === emp2) &&
-                    (areaSel === 'ALL' || b.dir === areaSel || b.area === areaSel) &&
-                    (deptoSel === 'ALL' || b.d === deptoSel || b.depto === deptoSel)
-                ).length;
-                prevHC = Math.max(0, prevPayroll - prevBajas);
-                vsText = `${growthLabels[growthPeriod]} (${prevHC})`;
-            }
-            growth = activeHC - prevHC;
-
-            const growthStatus = growth >= 0 ? "up" : "down";
-            const growthVal = isNaN(growth) ? '---' : (growth >= 0 ? `▲ +${growth}` : `▼ ${Math.abs(growth)}`);
-
-            // ACTIVE COUNTRIES: Count all that have data in the selected YEAR if period is ALL
-            const paisesSet = new Set();
-            (m === 'ALL' ? empsRaw : uniqueEmps).forEach(e => {
-                let code = (e.pa || '').trim().toUpperCase();
-                if (code === 'PN') code = 'PA';
-                if (code === 'DM' || code === 'DO') code = 'RD';
-                if (code && code !== 'NAT' && code !== 'PAIS') paisesSet.add(code);
-            });
-            const paisesSize = paisesSet.size;
-
-            let activeColor = "#8b5cf6";
-            if (paisesSize === 1 && uniqueEmps.length > 0) activeColor = getStyle(uniqueEmps[0].pa).color;
-
-            // Growth Selector UI
-            const growthSelector = `
+                // Growth Selector UI
+                const growthSelector = `
                 <div style="display:flex; gap:4px; margin-top:4px;">
                     <span onclick="window.selectedGrowthPeriod='1m'; renderAll();" style="cursor:pointer; font-size:7px; padding:2px 5px; border-radius:4px; background:${growthPeriod === '1m' ? 'var(--ac)' : '#f1f5f9'}; color:${growthPeriod === '1m' ? '#fff' : '#64748b'}; font-weight:800;">1M</span>
                     <span onclick="window.selectedGrowthPeriod='3m'; renderAll();" style="cursor:pointer; font-size:7px; padding:2px 5px; border-radius:4px; background:${growthPeriod === '3m' ? 'var(--ac)' : '#f1f5f9'}; color:${growthPeriod === '3m' ? '#fff' : '#64748b'}; font-weight:800;">3M</span>
@@ -2907,7 +2912,7 @@
                 </div>
             `;
 
-            document.getElementById('kpi0').innerHTML = `
+                document.getElementById('kpi0').innerHTML = `
                 ${kpiCard("HC Activo Real", activeHC, '<i class="fa-solid fa-user-check"></i>', activeColor, "Detalle de Activos", "sub")}
                 ${kpiCard("Contrataciones", hiresPeriod, '<i class="fa-solid fa-user-plus"></i>', "#10b981", "Detalle de Altas", "sub", `Altas Acumuladas: ${hiresYTD}`)}
                 ${kpiCard("Bajas Totales", bajasPeriod, '<i class="fa-solid fa-user-minus"></i>', "#ef4444", "Detalle de Bajas", "sub", `Bajas Acumuladas: ${bajasYTD}`)}
@@ -2915,19 +2920,20 @@
                 ${kpiCard("Países Activos", paisesSize, '<i class="fa-solid fa-earth-americas"></i>', "#f59e0b", null)}
             `;
 
-            // Filtrar Tenures para solo ACTIVOS
-            const targetYear = y === 'ALL' ? 9999 : parseInt(y);
-            const targetMonth = m === 'ALL' ? 12 : parseInt(m);
-            const activeEmpsForTenure = uniqueEmps.filter(e => {
-                const code = e.c || e.n;
-                const isBaja = allBajas.some(b => (b.c === code || b.n === code) && (b.y < targetYear || (b.y == targetYear && b.m <= targetMonth)));
-                return !isBaja;
-            });
+                // Filtrar Tenures para solo ACTIVOS
+                const targetYear = y === 'ALL' ? 9999 : parseInt(y);
+                const targetMonth = m === 'ALL' ? 12 : parseInt(m);
+                const activeEmpsForTenure = uniqueEmps.filter(e => {
+                    const code = e.c || e.n;
+                    const isBaja = allBajas.some(b => (b.c === code || b.n === code) && (b.y < targetYear || (b.y == targetYear && b.m <= targetMonth)));
+                    return !isBaja;
+                });
 
-            const tenures = activeEmpsForTenure.map(e => e.t || 0);
+                const tenures = activeEmpsForTenure.map(e => e.t || 0);
 
-            renderExecutiveCharts(tenures, y, m, hiresSet, uniqueEmps, empsRaw);
-            renderHCRegistry(uniqueEmps);
+                renderExecutiveCharts(tenures, y, m, hiresSet, uniqueEmps, empsRaw);
+                renderHCRegistry(uniqueEmps);
+            } catch (err) { console.error('❌ renderGeneral ERROR:', err); }
         }
 
         function renderExecutiveCharts(tenures, y, m, hiresSet, uniqueEmps, empsRaw) {

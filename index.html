@@ -432,14 +432,19 @@
         }
 
         .sidebar.collapsed .sidebar-footer .footer-logo-box,
-        .sidebar.collapsed .sidebar-footer .footer-text,
+        .sidebar.collapsed .footer-text,
         .sidebar.collapsed .dark-label {
             display: none !important;
         }
 
-        .sidebar.collapsed .sidebar-footer {
-            padding: 10px;
-            align-items: center;
+        .sidebar.collapsed .menu-item,
+        .sidebar.collapsed .footer-logo-box {
+            justify-content: center;
+            padding: 12px 0;
+        }
+
+        .sidebar.collapsed #darkIcon {
+            margin: 0 auto;
         }
 
         .sidebar.collapsed .sidebar-footer .menu-item {
@@ -2146,8 +2151,9 @@
                 statusHtml = `<div class="pill-badge" style="background:${pB}; color:${pC}; font-size:10px; font-weight:800; padding:4px 10px; border-radius:12px;">${statusText}</div>`;
             }
 
-            const aura = statusType === 'sub' ? `cursor:pointer; transform: translateY(0); transition: 0.3s;` : '';
-            const clic = statusType === 'sub' ? `onclick="switchView('${statusText}')" onmouseover="this.style.transform='translateY(-5px)'; this.style.boxShadow='var(--premium-shadow)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='var(--shadow-sm)';"` : '';
+            const isHtml = statusText && statusText.includes('<');
+            const aura = (statusType === 'sub' && !isHtml) ? `cursor:pointer; transform: translateY(0); transition: 0.3s;` : '';
+            const clic = (statusType === 'sub' && !isHtml) ? `onclick="switchView('${statusText}')" onmouseover="this.style.transform='translateY(-5px)'; this.style.boxShadow='var(--premium-shadow)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='var(--shadow-sm)';"` : '';
 
             return `
                 <div class="kpi-card" ${clic} style="border: 1px solid var(--bd); background: #fff; box-shadow: var(--shadow-sm); border-radius: var(--radius); min-height: 160px; padding: 24px; position: relative; overflow: hidden; ${aura}">
@@ -2932,7 +2938,7 @@
                     return !isBaja;
                 });
 
-                const tenures = activeEmpsForTenure.map(e => e.t || 0);
+                const tenures = activeEmpsForTenure.map(e => ({ ...e, tenure: e.t || 0 }));
 
                 renderExecutiveCharts(tenures, y, m, hiresSet, uniqueEmps, empsRaw);
                 renderHCRegistry(uniqueEmps);
@@ -3632,7 +3638,7 @@
                             </div>
                         </div>
                         <div style="text-align: right;">
-                            <div style="font-weight: 900; color: #3b82f6; font-size: 16px;">${e.tenure.toFixed(1)} <span style="font-size: 9px; font-weight: 700; color: #94a3b8;">AÑOS</span></div>
+                            <div style="font-weight: 900; color: #3b82f6; font-size: 16px;">${(Number(e.tenure) || 0).toFixed(1)} <span style="font-size: 9px; font-weight: 700; color: #94a3b8;">AÑOS</span></div>
                             <div style="font-size: 9px; color: #94a3b8; font-weight: 700;">Ingreso: ${e.fi}</div>
                         </div>
                     </div>`;

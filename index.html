@@ -2578,7 +2578,7 @@
                         if (isBad(dirVal)) dirVal = 'BI & OPERACIONES';
 
                         let pVal = (e.p || '').trim();
-                        if (!pVal || pVal === '0' || pVal === 'nan' || pVal === 'N/A' || pVal === 'PENDIENTE') pVal = 'POSICIÓN GENERAL';
+                        if (!pVal || pVal === '0' || pVal === 'nan' || pVal === 'N/A' || pVal === 'PENDIENTE') pVal = 'NO APLICABLE';
 
                         let xr = parseFloat(e.xr) || parseFloat(e.tr);
                         const tcKey = `${e.pa}|${e.y}|${e.m}`;

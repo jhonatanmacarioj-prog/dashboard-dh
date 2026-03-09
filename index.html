@@ -18,31 +18,37 @@
         google.charts.setOnLoadCallback(() => { window.googleLoaded = true; });
     </script>
     <script>
-        // SMART DATA LOADER: Detects if running from root or inside "DATA DASH"
+        // SMART DATA LOADER: Tries paths sequentially until one succeeds
         function loadData(callback) {
-            const tryPaths = [
-                'DATA%20DASH/data/full_hc_data.js',
-                'DATA DASH/data/full_hc_data.js',
+            var paths = [
                 'data/full_hc_data.js',
-                'https://jhonatanmacarioj-prog.github.io/dashboard-dh/DATA%20DASH/data/full_hc_data.js'
+                'DATA DASH/data/full_hc_data.js',
+                'DATA%20DASH/data/full_hc_data.js'
             ];
-            var loadedCount = 0;
-            var success = false;
+            var idx = 0;
 
-            tryPaths.forEach(function (path) {
+            function tryNext() {
+                if (idx >= paths.length) {
+                    callback(); // All failed
+                    return;
+                }
                 var s = document.createElement("script");
-                s.src = path;
+                s.src = paths[idx];
                 s.onload = function () {
-                    if (!success) { success = true; callback(); }
-                };
-                s.onerror = function () {
-                    loadedCount++;
-                    if (loadedCount === tryPaths.length && !success) {
-                        callback(); // Fail case: let the app handle undefined hcFullData
+                    if (typeof hcFullData !== 'undefined') {
+                        callback();
+                    } else {
+                        idx++;
+                        tryNext();
                     }
                 };
+                s.onerror = function () {
+                    idx++;
+                    tryNext();
+                };
                 document.head.appendChild(s);
-            });
+            }
+            tryNext();
         }
     </script>
     <style>

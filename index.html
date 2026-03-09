@@ -2752,7 +2752,10 @@
             const d = parseInt(parts[0]), mo = parseInt(parts[1]), yr = parseInt(parts[2]);
             const now = new Date();
             const hire = new Date(yr, mo - 1, d);
-            return Math.max(0, (now - hire) / (365.25 * 24 * 60 * 60 * 1000));
+            // Verify if hire is a valid date
+            if (isNaN(hire.getTime())) return 0;
+            const diffYears = (now - hire) / (365.25 * 24 * 60 * 60 * 1000);
+            return Math.max(0, diffYears);
         }
 
         function classifyRango(years) {

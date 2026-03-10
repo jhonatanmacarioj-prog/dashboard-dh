@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 
 <head>
@@ -1678,6 +1678,50 @@
                 app = window.hcFullData;
             }
 
+            // --- Pre-process data once to avoid expensive mapping on every filter change ---
+            console.time("Data Preprocessing");
+            const mappings = getSavedMappings();
+            const countryTCMap = JSON.parse(localStorage.getItem('asys_tc_map_v2') || '{}');
+
+            const mapRecord = (e) => {
+                const key = `${(e.p || 'N/A').trim()}|${e.pa || '🌎'}|${e.e || '🏢'}`;
+                const auto = getAutoMapping(e.p);
+                const m = mappings[key];
+                const isBad = v => !v || v === '0' || v === 'SIN DEPTO' || v === 'nan' || v === 'N/A' || v === 'PENDIENTE';
+
+                let dVal = (m && !isBad(m.d)) ? m.d : (!isBad(auto.d) ? auto.d : (e.d || ''));
+                let dirVal = (m && !isBad(m.dir)) ? m.dir : (!isBad(auto.dir) ? auto.dir : (e.dir || ''));
+
+                if (isBad(dVal)) dVal = 'OPERACIONES';
+                if (isBad(dirVal)) dirVal = 'BI & OPERACIONES';
+
+                let pVal = (e.p || '').trim();
+                if (!pVal || pVal === '0' || pVal === 'nan' || pVal === 'N/A' || pVal === 'PENDIENTE') pVal = 'NO APLICABLE';
+
+                let xr = parseFloat(e.xr) || parseFloat(e.tr);
+                const tcKey = `${e.pa}|${e.y}|${e.m}`;
+                if (countryTCMap[tcKey] && !isNaN(parseFloat(countryTCMap[tcKey]))) {
+                    xr = parseFloat(countryTCMap[tcKey]);
+                } else {
+                    if (e.pa === 'GT') xr = 7.66476;
+                    else if (e.pa === 'CR') xr = 508.45;
+                    else if (e.pa === 'PY') xr = 7860.00;
+                    else if (e.pa === 'NI') xr = 36.6243;
+                    else if (e.pa === 'HN') xr = 24.50;
+                    else if (e.pa === 'RD' || e.pa === 'DO' || e.pa === 'DM') xr = 58.50;
+                    else if (e.pa === 'JM') xr = 155.00;
+                    else if (e.pa === 'TT') xr = 6.78;
+                    else if (e.pa === 'PA' || e.pa === 'PN' || e.pa === 'SV') xr = 1.0;
+                }
+                if (!xr || xr <= 0 || isNaN(xr)) xr = 1.0;
+
+                return { ...e, dir: dirVal, d: dVal, p: pVal, xr: xr };
+            };
+
+            app.employees = (app.employees || []).map(mapRecord);
+            app.bajas_list = (app.bajas_list || []).map(mapRecord);
+            console.timeEnd("Data Preprocessing");
+
             // Re-bind global emps and bajas for other functions
             window.app = app;
             window.empsRaw = app.summary || [];
@@ -2564,48 +2608,13 @@
 
                     const { p: pais, e: emp, a: area, d: depto, y: yr, m: mo } = filters;
 
-                    const mapRecord = (e) => {
-                        const key = `${(e.p || 'N/A').trim()}|${e.pa || '🌎'}|${e.e || '🏢'}`;
-                        const auto = getAutoMapping(e.p);
-                        const m = mappings[key];
-                        const isBad = v => !v || v === '0' || v === 'SIN DEPTO' || v === 'nan' || v === 'N/A' || v === 'PENDIENTE';
-
-                        let dVal = (m && !isBad(m.d)) ? m.d : (!isBad(auto.d) ? auto.d : (e.d || ''));
-                        let dirVal = (m && !isBad(m.dir)) ? m.dir : (!isBad(auto.dir) ? auto.dir : (e.dir || ''));
-
-                        // Ensure no PENDIENTE labels - use logical fallbacks
-                        if (isBad(dVal)) dVal = 'OPERACIONES';
-                        if (isBad(dirVal)) dirVal = 'BI & OPERACIONES';
-
-                        let pVal = (e.p || '').trim();
-                        if (!pVal || pVal === '0' || pVal === 'nan' || pVal === 'N/A' || pVal === 'PENDIENTE') pVal = 'NO APLICABLE';
-
-                        let xr = parseFloat(e.xr) || parseFloat(e.tr);
-                        const tcKey = `${e.pa}|${e.y}|${e.m}`;
-                        if (countryTCMap[tcKey] && !isNaN(parseFloat(countryTCMap[tcKey]))) {
-                            xr = parseFloat(countryTCMap[tcKey]);
-                        } else {
-                            if (e.pa === 'GT') xr = 7.66476;
-                            else if (e.pa === 'CR') xr = 508.45;
-                            else if (e.pa === 'PY') xr = 7860.00;
-                            else if (e.pa === 'NI') xr = 36.6243;
-                            else if (e.pa === 'HN') xr = 24.50;
-                            else if (e.pa === 'RD' || e.pa === 'DO' || e.pa === 'DM') xr = 58.50; // RD fixed fallback
-                            else if (e.pa === 'JM') xr = 155.00;
-                            else if (e.pa === 'TT') xr = 6.78;
-                            else if (e.pa === 'PA' || e.pa === 'PN' || e.pa === 'SV') xr = 1.0;
-                        }
-                        if (!xr || xr <= 0 || isNaN(xr)) xr = 1.0;
-
-                        return { ...e, dir: dirVal, d: dVal, p: pVal, xr: xr };
-                    };
-
-                    const empsRaw = app.employees.map(mapRecord);
-                    const bajasRaw = (app.bajas_list || []).map(mapRecord);
+                    // Use already pre-processed data from app.employees and app.bajas_list
+                    const empsRaw = app.employees;
+                    const bajasRaw = app.bajas_list;
                     window.allBajasMapped = bajasRaw;
 
                     const emps = empsRaw.filter(e => {
-                        const curPa = (e.pa || '').trim().toUpperCase();
+                        const curPa = e.pa;
                         const matchPa = (window.selectedCountries && window.selectedCountries.length > 0)
                             ? window.selectedCountries.includes(curPa)
                             : (pais === 'ALL' ? true : curPa === pais);
@@ -2617,18 +2626,19 @@
                             (mo === 'ALL' ? true : e.m == mo);
                     });
 
-                    const sortedByTime = [...emps].sort((a, b) => (Number(a.y) - Number(b.y)) || (Number(a.m) - Number(b.m)));
                     const seenById = new Map();
-                    sortedByTime.forEach(e => {
-                        const code = String(e.c || '').trim().toUpperCase();
-                        const name = String(e.n || '').trim().toUpperCase();
-                        const base = (code && code !== 'N/A' && code !== 'NAN' && code !== '0') ? code : name;
-                        const personId = `${(e.pa || '').trim().toUpperCase()}|${(e.e || '').trim().toUpperCase()}|${base}`;
+                    for (let i = 0; i < emps.length; i++) {
+                        const e = emps[i];
+                        const code = e.c;
+                        const name = e.n;
+                        const base = (code && code !== 'N/A' && code !== '0') ? code : (name || '');
+                        const personId = `${e.pa}|${e.e}|${base.toUpperCase().trim()}`;
 
                         if (personId && personId !== 'UNKNOWN' && personId !== 'PENDIENTE' && personId !== '') {
+                            // Update or set - maintaining the latest (if sorted, but here we just need unique)
                             seenById.set(personId, e);
                         }
-                    });
+                    }
                     cachedEmps = { unique: [...seenById.values()], raw: emps, allRaw: empsRaw, bajas: bajasRaw };
                     lastFilterKey = filterKey;
                 }

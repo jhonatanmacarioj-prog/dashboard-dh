@@ -2622,7 +2622,8 @@
                     sortedByTime.forEach(e => {
                         const code = String(e.c || '').trim().toUpperCase();
                         const name = String(e.n || '').trim().toUpperCase();
-                        const personId = (code && code !== 'N/A' && code !== 'NAN' && code !== '0') ? code : name;
+                        const base = (code && code !== 'N/A' && code !== 'NAN' && code !== '0') ? code : name;
+                        const personId = `${(e.pa || '').trim().toUpperCase()}|${(e.e || '').trim().toUpperCase()}|${base}`;
 
                         if (personId && personId !== 'UNKNOWN' && personId !== 'PENDIENTE' && personId !== '') {
                             seenById.set(personId, e);
@@ -2921,7 +2922,7 @@
 
                 // ACTIVE COUNTRIES: Count all that have data in the selected YEAR if period is ALL
                 const paisesSet = new Set();
-                (m === 'ALL' ? empsRaw : uniqueEmps).forEach(e => {
+                uniqueEmps.forEach(e => {
                     let code = (e.pa || '').trim().toUpperCase();
                     if (code === 'PN') code = 'PA';
                     if (code === 'DM' || code === 'DO') code = 'RD';
@@ -3012,27 +3013,11 @@
             const countryGrid = document.getElementById('countryGrid');
             if (countryGrid) {
 
-                // DATA RECOVERY: If a country is 0 in countByPa but has ANY data in empsRaw for the selected year, 
-                // find its LATEST available month and use that HC.
-                priorityCountries.forEach(c => {
-                    if ((countByPa[c] || 0) === 0) {
-                        const countryData = empsRaw.filter(e => {
-                            let ec = (e.pa || '').trim().toUpperCase();
-                            if (ec === 'PN') ec = 'PA';
-                            if (ec === 'DM' || ec === 'DO') ec = 'RD';
-                            return ec === c && (y === 'ALL' || e.y == y);
-                        });
-                        if (countryData.length > 0) {
-                            const maxYear = Math.max(...countryData.map(e => parseInt(e.y)));
-                            const countryYearData = countryData.filter(e => parseInt(e.y) === maxYear);
-                            const latestMonth = Math.max(...countryYearData.map(e => parseInt(e.m)));
-                            const latestHC = new Set(countryYearData.filter(e => parseInt(e.m) === latestMonth).map(e => e.c || e.n)).size;
-                            countByPa[c] = latestHC;
-                        }
-                    }
-                });
-
-                countryGrid.innerHTML = priorityCountries.map(c => {
+                countryGrid.innerHTML = priorityCountries.filter(c => {
+                    const ovrKey = `${c}_${emp2}_${y}_${m}`;
+                    const ovrHC = (overrides[ovrKey] && overrides[ovrKey].hc !== null) ? overrides[ovrKey].hc : null;
+                    return (countByPa[c] || 0) > 0 || ovrHC > 0;
+                }).map(c => {
                     let hc = countByPa[c] || 0;
                     const ovrKey = `${c}_${emp2}_${y}_${m}`;
                     if (overrides[ovrKey] && overrides[ovrKey].hc !== null) hc = overrides[ovrKey].hc;
@@ -3067,12 +3052,7 @@
                     if (countByPaRadar.hasOwnProperty(code)) countByPaRadar[code]++;
                 });
 
-                // Also apply recovery data from countByPa (already computed above for flags)
-                radarCountries.forEach(c => {
-                    if (countByPaRadar[c] === 0 && countByPa && countByPa[c]) {
-                        countByPaRadar[c] = countByPa[c];
-                    }
-                });
+
 
                 const radarLabels = radarCountries.map(c => paisMap[c] || c);
                 const rawRadarData = radarCountries.map(c => countByPaRadar[c]);

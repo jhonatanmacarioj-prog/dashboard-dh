@@ -3613,24 +3613,33 @@
             if (ctxYTD) {
                 // Calculate LY HC for each month
                 const dataLY = Array(12).fill(0);
+                // Optimized: Filter once for LY and once for CY, then distribute to months
                 if (y !== 'ALL') {
                     const ly = parseInt(y) - 1;
-                    for (let month = 1; month <= 12; month++) {
-                        dataLY[month - 1] = new Set(empsRaw.filter(e => e.y == ly && e.m == month &&
-                            (pais2 === 'ALL' || e.pa === pais2) && (emp2 === 'ALL' || e.e === emp2) &&
-                            (areaSel === 'ALL' || e.dir === areaSel) && (deptoSel === 'ALL' || e.d === deptoSel)
-                        ).map(e => e.c || e.n)).size;
-                    }
+                    const lyEmpsRaw = empsRaw.filter(e => e.y == ly &&
+                        (pais2 === 'ALL' || e.pa === pais2) &&
+                        (emp2 === 'ALL' || e.e === emp2) &&
+                        (areaSel === 'ALL' || e.dir === areaSel) &&
+                        (deptoSel === 'ALL' || e.d === deptoSel));
+                    
+                    const lyMonthsSets = Array.from({length: 12}, () => new Set());
+                    lyEmpsRaw.forEach(e => {
+                        if (e.m >= 1 && e.m <= 12) lyMonthsSets[e.m - 1].add(e.c || e.n);
+                    });
+                    for (let i = 0; i < 12; i++) dataLY[i] = lyMonthsSets[i].size;
                 }
 
-                // Current Year HC for each month
-                const dataCY = Array(12).fill(0);
-                for (let month = 1; month <= 12; month++) {
-                    dataCY[month - 1] = new Set(empsRaw.filter(e => e.y == y && e.m == month &&
-                        (pais2 === 'ALL' || e.pa === pais2) && (emp2 === 'ALL' || e.e === emp2) &&
-                        (areaSel === 'ALL' || e.dir === areaSel) && (deptoSel === 'ALL' || e.d === deptoSel)
-                    ).map(e => e.c || e.n)).size;
-                }
+                const cyEmpsRaw = empsRaw.filter(e => e.y == y &&
+                    (pais2 === 'ALL' || e.pa === pais2) &&
+                    (emp2 === 'ALL' || e.e === emp2) &&
+                    (areaSel === 'ALL' || e.dir === areaSel) &&
+                    (deptoSel === 'ALL' || e.d === deptoSel));
+                    
+                const cyMonthsSets = Array.from({length: 12}, () => new Set());
+                cyEmpsRaw.forEach(e => {
+                    if (e.m >= 1 && e.m <= 12) cyMonthsSets[e.m - 1].add(e.c || e.n);
+                });
+                const dataCY = cyMonthsSets.map(s => s.size);
 
                 activeCharts.push(new Chart(ctxYTD.getContext('2d'), {
                     type: 'line',
@@ -4506,21 +4515,25 @@
                 trendSlots.push({ y: y2, m: m2, label: fullMonths[m2 - 1] + ' ' + String(y2).slice(-2) });
             }
 
-            const varTrend = new Array(spanMonths).fill(0);
+            // Optimized: Use a Map for O(1) slot lookup
+            const slotLookup = new Map();
+            trendSlots.forEach((s, i) => slotLookup.set(`${s.y}|${s.m}`, i));
+
             app.employees.forEach(e => {
                 const matchPais = pais === 'ALL' || e.pa === pais;
                 const matchEmp = emp === 'ALL' || e.e === emp;
                 const matchArea = area === 'ALL' || e.dir === area;
                 const matchDepto = depto === 'ALL' || e.d === depto;
                 if (!matchPais || !matchEmp || !matchArea || !matchDepto) return;
+                
                 if (window.costSearch) {
                     const sVal = window.costSearch.toLowerCase();
                     if (!((e.n || '').toLowerCase().includes(sVal) || (e.p || '').toLowerCase().includes(sVal) || (e.c || '').toLowerCase().includes(sVal))) return;
                 }
-                for (let idx = 0; idx < spanMonths; idx++) {
-                    if (e.y == trendSlots[idx].y && e.m == trendSlots[idx].m) {
-                        varTrend[idx] += getC(e.bv, e.xr, showUSD, e.pa);
-                    }
+
+                const key = `${e.y}|${e.m}`;
+                if (slotLookup.has(key)) {
+                    varTrend[slotLookup.get(key)] += getC(e.bv, e.xr, showUSD, e.pa);
                 }
             });
             const trendLabels = trendSlots.map(s => s.label);
@@ -4778,14 +4791,17 @@
             }
 
             const annualTrend = Array(12).fill(0);
+            const twelveLookup = new Map();
+            twelveSlots.forEach((s, i) => twelveLookup.set(`${s.y}|${s.m}`, i));
+
             app.employees.forEach(e => {
                 if ((pF === 'ALL' || e.pa === pF) && (eF === 'ALL' || e.e === eF)) {
-                    for (let i = 0; i < 12; i++) {
-                        if (e.y == twelveSlots[i].y && e.m == twelveSlots[i].m) {
-                            const base = (Number(e.so) || 0) + (Number(e.b37) || 0) + (Number(e.b78) || 0) + (Number(e.bv) || 0) + (Number(e.he) || 0) + (Number(e.p_agui) || 0) + (Number(e.p_b14) || 0) + (Number(e.p_pat) || 0);
-                            const extras = (window.inclVac !== false ? (Number(e.p_vac) || 0) : 0) + (window.inclInd !== false ? (Number(e.p_ind) || 0) : 0);
-                            annualTrend[i] += getC(base + extras, e.xr, showUSD, e.pa);
-                        }
+                    const key = `${e.y}|${e.m}`;
+                    if (twelveLookup.has(key)) {
+                        const idx = twelveLookup.get(key);
+                        const base = (Number(e.so) || 0) + (Number(e.b37) || 0) + (Number(e.b78) || 0) + (Number(e.bv) || 0) + (Number(e.he) || 0) + (Number(e.p_agui) || 0) + (Number(e.p_b14) || 0) + (Number(e.p_pat) || 0);
+                        const extras = (window.inclVac !== false ? (Number(e.p_vac) || 0) : 0) + (window.inclInd !== false ? (Number(e.p_ind) || 0) : 0);
+                        annualTrend[idx] += getC(base + extras, e.xr, showUSD, e.pa);
                     }
                 }
             });

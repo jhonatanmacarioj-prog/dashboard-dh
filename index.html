@@ -1943,71 +1943,29 @@
                     app = window.hcFullData;
                 }
 
-                // 1. Preproceso (O(N) una sola vez)
-                const emps = app.summary || [];
-                const bajas = app.bajas_list || [];
-                
-                // Mapas de acceso rápido: pais -> empresa -> año -> mes -> { total: Set, altas: Set, bajas: 0 }
-                const proc = {};
-                
-                // Procesar HC y Altas
-                for (let i = 0; i < emps.length; i++) {
-                    const e = emps[i];
-                    const pa = e.pa || 'ALL';
-                    const emp = e.e || 'ALL';
-                    const yr = e.y;
-                    const mo = e.m;
-                    
-                    if (!proc[pa]) proc[pa] = {};
-                    if (!proc[pa][emp]) proc[pa][emp] = {};
-                    if (!proc[pa][emp][yr]) proc[pa][emp][yr] = {};
-                    if (!proc[pa][emp][yr][mo]) proc[pa][emp][yr][mo] = { total: new Set(), altas: 0, bajas: 0 };
-                    
-                    const slot = proc[pa][emp][yr][mo];
-                    const pKey = e.c || e.n;
-                    slot.total.add(pKey);
-                    
-                    // Lógica de Ingresos (Altas)
-                    if (e.fi) {
-                        const p = e.fi.split('/');
-                        if (p.length >= 3 && p[2] == yr && p[1] == mo) {
-                            slot.altas++;
-                        }
-                    }
+                // HARD RESET: Ensure only Excel mappings are used (Requested 10/03/2026 - v5)
+                if (!localStorage.getItem('asys_pos_reset_v5')) {
+                    localStorage.removeItem('asys_pos_overrides');
+                    localStorage.setItem('asys_pos_reset_v5', 'DONE');
+                    console.log('🧹 Mapping Hard Reset v5: Purged legacy local storage');
                 }
-                
-                // Procesar Bajas
-                for (let i = 0; i < bajas.length; i++) {
-                    const b = bajas[i];
-                    const pa = b.pa || 'ALL';
-                    const emp = b.e || 'ALL';
-                    const yr = b.y;
-                    const mo = b.m;
-                    
-                    if (!proc[pa]) proc[pa] = {};
-                    if (!proc[pa][emp]) proc[pa][emp] = {};
-                    if (!proc[pa][emp][yr]) proc[pa][emp][yr] = {};
-                    if (!proc[pa][emp][yr][mo]) proc[pa][emp][yr][mo] = { total: new Set(), altas: 0, bajas: 0 };
-                    
-                    proc[pa][emp][yr][mo].bajas++;
-                }
-                
-                window._procData = proc;
 
                 // Auto-load position overrides from Excel classification file
                 if (window.POSITION_OVERRIDES_INIT) {
                     const existing = JSON.parse(localStorage.getItem('asys_pos_overrides') || '{}');
                     const merged = Object.assign({}, window.POSITION_OVERRIDES_INIT, existing);
                     localStorage.setItem('asys_pos_overrides', JSON.stringify(merged));
-                    console.log('✅ Position overrides loaded:', Object.keys(window.POSITION_OVERRIDES_INIT).length, 'from Excel');
+                    console.log('✅ Base overrides active:', Object.keys(window.POSITION_OVERRIDES_INIT).length);
                 }
 
+                // Re-bind global emps and bajas for other functions
                 window.app = app;
                 window.empsRaw = app.summary || [];
                 window.allBajas = app.bajas_list || [];
 
                 initFilters();
 
+                // Handle google charts loading state
                 if (window.googleLoaded) {
                     switchTab(0);
                 } else if (window.google && google.charts) {
@@ -2019,7 +1977,7 @@
                     switchTab(0);
                 }
 
-                console.log("Dashboard Initialized with High Performance Pre-processing");
+                console.log("Dashboard Initialized Successfully with Data");
             }
 
             // --- APPLY UI CUSTOM PREFERENCES ---
@@ -2345,15 +2303,16 @@
                         const pa = (m["PAÍS"] || '🌎').toUpperCase();
                         const emp = (m["EMPRESA"] || '🏢').toUpperCase();
                         const key = `${p}|${pa}|${emp}`;
+                        const normKey = `${p.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase()}|${pa}|${emp}`;
 
-                        const normP = p.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
-                        const normFPos = fPos.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+                        const searchP = p.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+                        const searchFPos = fPos.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
 
                         if (fPa && !pa.includes(fPa)) return;
                         if (fEmp && !emp.includes(fEmp)) return;
-                        if (fPos && !normP.includes(normFPos)) return;
+                        if (fPos && !searchP.includes(searchFPos)) return;
 
-                        seenKeys.add(key);
+                        seenKeys.add(normKey);
                         combos.push({
                             p, pa, emp, key,
                             dir: m["DIRECCIÓN"] || 'OTRO',
@@ -2370,18 +2329,18 @@
                     if (!p || invalidPositions.includes(p.toUpperCase())) return;
                     const pa = (e.pa || '🌎').toUpperCase();
                     const emp = (e.e || '🏢').toUpperCase();
-                    const key = `${p}|${pa}|${emp}`;
+                    const normKey = `${p.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase()}|${pa}|${emp}`;
 
-                    const normP = p.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
-                    const normFPos = fPos.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+                    const searchP = p.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+                    const searchFPos = fPos.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
 
-                    if (seenKeys.has(key)) return;
+                    if (seenKeys.has(normKey)) return;
 
                     if (fPa && !pa.includes(fPa)) return;
                     if (fEmp && !emp.includes(fEmp)) return;
-                    if (fPos && !normP.includes(normFPos)) return;
+                    if (fPos && !searchP.includes(searchFPos)) return;
 
-                    seenKeys.add(key);
+                    seenKeys.add(normKey);
                     combos.push({
                         p, pa, emp, key,
                         dir: e.dir || 'OTRO',
@@ -4108,69 +4067,87 @@
 
 
 
-                // --- 0. DATA PREPARATION (FIXED & ROLLING - OPTIMIZED) ---
+                // --- 0. DATA PREPARATION (FIXED & ROLLING) ---
                 const trendData = Array(12).fill(0);
                 const monthlyAltas = Array(12).fill(0);
-                const monthlyBajasCount = Array(12).fill(0);
+                const monthlyBajas = Array(12).fill(0);
 
+                // Use let to avoid redeclaration issues across re-renders if necessary, 
+                // though renderExecutiveCharts is usually fresh. 
+                // However, the linter caught a duplicate.
                 let vLenRoll = window._hcViewLength || 6;
                 let vLenOldRoll = window._hcViewLengthOld || 6;
 
+                // Update trend card headers
                 const hcTrendPeriodEl = document.getElementById('hcTrendPeriod');
                 if (hcTrendPeriodEl) hcTrendPeriodEl.innerText = vLenRoll;
                 const hcTrendOldPeriodEl = document.getElementById('hcTrendOldPeriod');
                 if (hcTrendOldPeriodEl) hcTrendOldPeriodEl.innerText = vLenOldRoll;
 
-                // Pre-calculate target dates
-                let maxYearP = 2025;
-                const emps = app.summary || [];
-                for (let i = 0; i < emps.length; i++) {
-                    if (emps[i].y > maxYearP) maxYearP = emps[i].y;
+
+                // Safe Max Year (avoiding spread crash)
+                let maxYear = 2025;
+                for (let i = 0; i < empsRaw.length; i++) {
+                    let yr = parseInt(empsRaw[i].y);
+                    if (yr > maxYear) maxYear = yr;
                 }
-                let targetY = (y === 'ALL') ? maxYearP : parseInt(y);
-                let latestMP = 1;
-                for (let i = 0; i < emps.length; i++) {
-                    if (emps[i].y == targetY && emps[i].m > latestMP) latestMP = emps[i].m;
-                }
-                let targetM = m === 'ALL' ? latestMP : parseInt(m);
+                let targetY = (y === 'ALL') ? maxYear : parseInt(y);
 
-                // Use proc engine for instant annual trend
-                const proc = window._procData || {};
-                const pais_opt = (getFilters().p || 'ALL');
-                const emp_opt = (getFilters().e || 'ALL');
-
-                for (let month = 1; month <= 12; month++) {
-                    let totalVal = 0;
-                    let altasVal = 0;
-                    let bajasVal = 0;
-                    
-                    const iterate = (pa, em) => {
-                        const slot = proc[pa]?.[em]?.[targetY]?.[month];
-                        if (slot) {
-                            totalVal += slot.total.size;
-                            altasVal += slot.altas;
-                            bajasVal += slot.bajas;
+                let latestM = 1;
+                if (y === 'ALL') {
+                    for (let i = 0; i < empsRaw.length; i++) {
+                        if (empsRaw[i].y == targetY) {
+                            let mn = parseInt(empsRaw[i].m);
+                            if (mn > latestM) latestM = mn;
                         }
-                    };
-
-                    if (pais_opt === 'ALL') {
-                        for (let pa in proc) {
-                            if (emp_opt === 'ALL') {
-                                for (let em in proc[pa]) iterate(pa, em);
-                            } else iterate(pa, emp_opt);
-                        }
-                    } else {
-                        if (emp_opt === 'ALL') {
-                            for (let em in proc[pais_opt]) iterate(pais_opt, em);
-                        } else iterate(pais_opt, emp_opt);
                     }
-                    
-                    trendData[month - 1] = totalVal;
-                    monthlyAltas[month - 1] = altasVal;
-                    monthlyBajasCount[month - 1] = bajasVal;
+                }
+                let targetM = m === 'ALL' ? latestM : parseInt(m);
+
+                // Populate Annual logic
+                for (let month = 1; month <= 12; month++) {
+                    let count = 0;
+                    const seen = new Set();
+                    for (let i = 0; i < empsRaw.length; i++) {
+                        const e = empsRaw[i];
+                        if (e.y == targetY && e.m == month &&
+                            (pais2 === 'ALL' || e.pa === pais2) &&
+                            (emp2 === 'ALL' || e.e === emp2) &&
+                            (areaSel === 'ALL' || e.dir === areaSel || e.area === areaSel) &&
+                            (deptoSel === 'ALL' || e.d === deptoSel || e.depto === deptoSel)) {
+                            seen.add(e.c || e.n);
+                        }
+                    }
+                    trendData[month - 1] = seen.size;
                 }
 
-                // Rolling Window 준비 (OPTIMIZED)
+                const seenHires = new Set();
+                empsRaw.forEach(e => {
+                    if ((pais2 === 'ALL' || e.pa === pais2) && (emp2 === 'ALL' || e.e === emp2) &&
+                        (areaSel === 'ALL' || e.dir === areaSel || e.area === areaSel) && (deptoSel === 'ALL' || e.d === deptoSel || e.depto === deptoSel)) {
+                        if (e.fi) {
+                            const parts = e.fi.split('/');
+                            if (parts.length >= 3 && parseInt(parts[2]) == targetY) {
+                                const mIdx = parseInt(parts[1]);
+                                const personKey = (e.c || e.n) + "|" + e.fi;
+                                if (mIdx >= 1 && mIdx <= 12 && !seenHires.has(personKey)) {
+                                    monthlyAltas[mIdx - 1]++;
+                                    seenHires.add(personKey);
+                                }
+                            }
+                        }
+                    }
+                });
+
+                const bajasArray = app.bajas_list || [];
+                bajasArray.forEach(b => {
+                    if ((pais2 === 'ALL' || b.pa === pais2) && (emp2 === 'ALL' || b.e === emp2) &&
+                        (areaSel === 'ALL' || b.dir === areaSel || b.area === areaSel) && (deptoSel === 'ALL' || b.d === deptoSel || b.depto === deptoSel)) {
+                        if (b.y == targetY && b.m >= 1 && b.m <= 12) monthlyBajas[b.m - 1]++;
+                    }
+                });
+
+                // Rolling Window 준비
                 const dLabels = []; const dTotal = []; const dAltas = []; const dBajas = [];
                 const vLenRollAB = window._hcViewLength || 6;
 
@@ -4180,34 +4157,34 @@
                     while (checkM < 1) { checkM += 12; checkY--; }
                     dLabels.push(monthNamesArr[checkM - 1] + (checkY !== targetY ? " '" + String(checkY).slice(-2) : ""));
 
-                    let totalVal = 0;
-                    let altasVal = 0;
-                    let bajasVal = 0;
-
-                    const iterate = (pa, em) => {
-                        const slot = proc[pa]?.[em]?.[checkY]?.[checkM];
-                        if (slot) {
-                            totalVal += slot.total.size;
-                            altasVal += slot.altas;
-                            bajasVal += slot.bajas;
-                        }
-                    };
-
-                    if (pais_opt === 'ALL') {
-                        for (let pa in proc) {
-                            if (emp_opt === 'ALL') {
-                                for (let em in proc[pa]) iterate(pa, em);
-                            } else iterate(pa, emp_opt);
-                        }
-                    } else {
-                        if (emp_opt === 'ALL') {
-                            for (let em in proc[pais_opt]) iterate(pais_opt, em);
-                        } else iterate(pais_opt, emp_opt);
+                    let c = 0; const s = new Set();
+                    for (let j = 0; j < empsRaw.length; j++) {
+                        const e = empsRaw[j];
+                        if (e.y == checkY && e.m == checkM && (pais2 === 'ALL' || e.pa === pais2) && (emp2 === 'ALL' || e.e === emp2) && (areaSel === 'ALL' || e.dir === areaSel) && (deptoSel === 'ALL' || e.d === deptoSel)) s.add(e.c || e.n);
                     }
+                    dTotal.push(s.size);
 
-                    dTotal.push(totalVal);
-                    dAltas.push(altasVal);
-                    dBajas.push(bajasVal);
+                    let ra = 0; const seenR = new Set();
+                    for (let j = 0; j < empsRaw.length; j++) {
+                        const e = empsRaw[j];
+                        const pKey = (e.c || e.n);
+                        if (e.fi && (pais2 === 'ALL' || e.pa === pais2) && (emp2 === 'ALL' || e.e === emp2)) {
+                            const p = e.fi.split('/');
+                            if (p.length >= 3 && parseInt(p[2]) == checkY && parseInt(p[1]) == checkM && !seenR.has(pKey)) {
+                                ra++; seenR.add(pKey);
+                            }
+                        }
+                    }
+                    dAltas.push(ra);
+
+                    let rb = 0;
+                    for (let j = 0; j < bajasArray.length; j++) {
+                        const b = bajasArray[j];
+                        const curPa = (b.pa || '').trim().toUpperCase();
+                        const matchPa = countries.length === 0 || countries.includes(curPa);
+                        if (b.y == checkY && b.m == checkM && matchPa && (emp2 === 'ALL' || b.e === emp2)) rb++;
+                    }
+                    dBajas.push(rb);
                 }
 
                 // POPULATE COMPARISON GRID
@@ -4239,7 +4216,7 @@
 
                 let ytdAcc = 0;
                 const dataYTD = monthlyAltas.map(a => { ytdAcc += a; return ytdAcc; });
-                const dataNeto = monthlyAltas.map((a, i) => a - monthlyBajasCount[i]);
+                const dataNeto = monthlyAltas.map((a, i) => a - monthlyBajas[i]);
 
                 const ctxTrendPro = document.getElementById('chartHCTrendPro');
                 if (ctxTrendPro) {
@@ -5493,40 +5470,16 @@
                 }
 
                 const varTrend = new Array(spanMonths).fill(0);
-                const proc = window._procData || {};
-                
-                for (let idx = 0; idx < spanMonths; idx++) {
-                    const slotY = trendSlots[idx].y;
-                    const slotM = trendSlots[idx].m;
-                    
-                    const iterateVar = (pa, em) => {
-                        // For Variable pay trend, we still need to filter by search if active.
-                        // However, we can optimize the core lookup.
-                        // If there's no search, we could use pre-processed variable pay too.
-                        // For now, let's just use the emps list but only for the specific year/month.
-                        // But wait, my proc engine doesn't store sums yet. 
-                        // I'll stick to a slightly better loop for now or enhance proc.
-                        // Actually, let's just use a filtered list for the specific month/year.
-                    };
-                }
-
-                // Optimized Cost Loops
-                const baseEmps = app.employees || [];
-                // Filter once if possible
-                const costFiltered = baseEmps.filter(e => {
-                    const mP = pais === 'ALL' || e.pa === pais;
-                    const mE = emp === 'ALL' || e.e === emp;
-                    const mA = area === 'ALL' || e.dir === area;
-                    const mD = depto === 'ALL' || e.d === depto;
-                    if (!mP || !mE || !mA || !mD) return false;
+                app.employees.forEach(e => {
+                    const matchPais = pais === 'ALL' || e.pa === pais;
+                    const matchEmp = emp === 'ALL' || e.e === emp;
+                    const matchArea = area === 'ALL' || e.dir === area;
+                    const matchDepto = depto === 'ALL' || e.d === depto;
+                    if (!matchPais || !matchEmp || !matchArea || !matchDepto) return;
                     if (window.costSearch) {
                         const sVal = window.costSearch.toLowerCase();
-                        if (!((e.n || '').toLowerCase().includes(sVal) || (e.p || '').toLowerCase().includes(sVal) || (e.c || '').toLowerCase().includes(sVal))) return false;
+                        if (!((e.n || '').toLowerCase().includes(sVal) || (e.p || '').toLowerCase().includes(sVal) || (e.c || '').toLowerCase().includes(sVal))) return;
                     }
-                    return true;
-                });
-
-                costFiltered.forEach(e => {
                     for (let idx = 0; idx < spanMonths; idx++) {
                         if (e.y == trendSlots[idx].y && e.m == trendSlots[idx].m) {
                             varTrend[idx] += getC(e.bv, e.xr, showUSD, e.pa);
@@ -5788,12 +5741,14 @@
                 }
 
                 const annualTrend = Array(12).fill(0);
-                costFiltered.forEach(e => {
-                    for (let i = 0; i < 12; i++) {
-                        if (e.y == twelveSlots[i].y && e.m == twelveSlots[i].m) {
-                            const base = (Number(e.so) || 0) + (Number(e.b37) || 0) + (Number(e.b78) || 0) + (Number(e.bv) || 0) + (Number(e.he) || 0) + (Number(e.p_agui) || 0) + (Number(e.p_b14) || 0) + (Number(e.p_pat) || 0);
-                            const extras = (window.inclVac !== false ? (Number(e.p_vac) || 0) : 0) + (window.inclInd !== false ? (Number(e.p_ind) || 0) : 0);
-                            annualTrend[i] += getC(base + extras, e.xr, showUSD, e.pa);
+                app.employees.forEach(e => {
+                    if ((pF === 'ALL' || e.pa === pF) && (eF === 'ALL' || e.e === eF)) {
+                        for (let i = 0; i < 12; i++) {
+                            if (e.y == twelveSlots[i].y && e.m == twelveSlots[i].m) {
+                                const base = (Number(e.so) || 0) + (Number(e.b37) || 0) + (Number(e.b78) || 0) + (Number(e.bv) || 0) + (Number(e.he) || 0) + (Number(e.p_agui) || 0) + (Number(e.p_b14) || 0) + (Number(e.p_pat) || 0);
+                                const extras = (window.inclVac !== false ? (Number(e.p_vac) || 0) : 0) + (window.inclInd !== false ? (Number(e.p_ind) || 0) : 0);
+                                annualTrend[i] += getC(base + extras, e.xr, showUSD, e.pa);
+                            }
                         }
                     }
                 });

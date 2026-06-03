@@ -1,0 +1,19 @@
+# Ignorar archivos innecesarios
+scripts/
+*.py
+*.bat
+*.vbs
+__pycache__/
+*.pyc
+*.xlsx
+*.xls
+*.json
+*.tmp
+*.bak
+*.old
+*.lock
+desktop.ini
+Thumbs.db
+.DS_Store
+js/dashboard.bundle.20260523.2ff44cdc.js
+js/dashboard.bundle.20260523.8e7df7b1.js

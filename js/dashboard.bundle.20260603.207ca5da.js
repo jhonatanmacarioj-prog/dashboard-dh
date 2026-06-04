@@ -604,7 +604,7 @@ function switchTab(n) {
     console.log('  switchTab:', n);
     window.activeTab = n;
 
-    const titles = ["HEADCOUNT", "ORGANIGRAMA", "DESVINCULACIONES", "INCIDENCIAS DE PAGO", "CONCILIACION ISR", "ANALISIS DE COSTOS", "CONFIGURACION", "HC DINAMICO"];
+    const titles = ["HEADCOUNT", "ORGANIGRAMA", "DESVINCULACIONES", "INCIDENCIAS DE PAGO", "CONCILIACIÓN ISR", "ANÁLISIS DE COSTOS", "CONFIGURACIÓN", "HC DINÁMICO"];
     const titleEl = document.getElementById('dynamicHCTitle');
     const fastTitle = titles[n] || "Dashboard";
 
@@ -1830,9 +1830,9 @@ function mapGetStyle(p) {
                                 Object.entries(tabCfg).forEach(([t,cfg]) => {
                                     const el = document.getElementById(cfg.btn);
                                     if (!el) return;
-                                    el.style.background = (t===tab) ? cfg.color : 'transparent';
-                                    el.style.color      = (t===tab) ? '#fff'   : cfg.color;
-                                    el.style.border     = `1.5px solid ${cfg.color}`;
+                                    el.style.setProperty('--audit-color', cfg.color);
+                                    el.classList.toggle('is-active', t === tab);
+                                    el.style.color = cfg.color;
                                 });
 
                                 const badge    = document.getElementById('auditBadge');
@@ -1928,10 +1928,66 @@ function mapGetStyle(p) {
                                             const missingList = peopleBridge.movementRows.filter(x => x.kind.includes('DESAPARECE') || x.kind.includes('FALTA'));
                                             const extraList = peopleBridge.movementRows.filter(x => x.kind.includes('BAJA') || x.kind.includes('SOBRA') || x.kind.includes('NUEVO'));
                                             const maxIssue = Math.max(c.missing, c.extra, 1);
-                                            const rowHtml = (items) => items.length ? items.map((x) => {
+                                                                                                                                    let netIssueRows = c.netDiff > 0
+                                                ? missingList.slice(0, Math.abs(c.netDiff))
+                                                : c.netDiff < 0
+                                                    ? extraList.slice(0, Math.abs(c.netDiff))
+                                                    : [];
+                                            const netIssueTarget = Math.abs(Number(c.netDiff || 0));
+                                            if (netIssueTarget && netIssueRows.length < netIssueTarget) {
+                                                const fallback = [];
+                                                const fallbackRows = [...discOnly, ...data.filter(r => r.diff !== 0 && !discOnly.includes(r))];
+                                                const pickNames = (r) => {
+                                                    if (c.netDiff > 0) return (r.diff < 0 ? (r.altas_names || []) : []);
+                                                    if (c.netDiff < 0) return (r.diff > 0 ? (r.bajas_names || []) : []);
+                                                    return [];
+                                                };
+                                                const lookupPersonByName = (name, baseRow) => {
+                                                    const key = auditNormText ? auditNormText(name) : String(name || '').toUpperCase();
+                                                    const sources = [...((window.app && window.app.employees) || []), ...((window.app && window.app.bajas_list) || [])];
+                                                    return sources.find(p => (!baseRow || ((!baseRow.pa || p.pa === baseRow.pa) && (!baseRow.e || p.e === baseRow.e))) && (auditNormText ? auditNormText(p.n) : String(p.n || '').toUpperCase()) === key) || {};
+                                                };
+                                                fallbackRows.forEach(r => {
+                                                    pickNames(r).forEach(name => {
+                                                        if (fallback.length >= netIssueTarget) return;
+                                                        const cleanName = auditCleanText(name || '');
+                                                        if (!cleanName) return;
+                                                        const key = cleanName.toUpperCase();
+                                                        if (fallback.some(x => String(x.row.n || '').toUpperCase() === key)) return;
+                                                        const personMatch = lookupPersonByName(cleanName, r);
+                                                        fallback.push({
+                                                            kind: c.netDiff > 0 ? 'FALTA EN HC NETO' : 'SOBRA EN HC NETO',
+                                                            row: { c: personMatch.c || '-', n: personMatch.n || cleanName, pa: personMatch.pa || r.pa || '', e: personMatch.e || r.e || '', p: personMatch.p || '' },
+                                                            monthLabel: `${months[r.m] || ''} ${r.y || ''}`.trim() || peopleBridge.labels.current,
+                                                            detail: c.netDiff > 0 ? ('FALTA EN PLANILLA CONSOLIDADA / HC NETO EN ' + ((personMatch.e || r.e || 'EMPRESA') + ' ' + (personMatch.pa || r.pa || '')).trim() + '. Revisar altas del mes.') : ('ESTA DE BAJA DE MAS EN BAJAS DE ' + ((personMatch.e || r.e || 'EMPRESA') + ' ' + (personMatch.pa || r.pa || '')).trim() + '. Revisar si la baja esta duplicada o aplicada de mas.')
+                                                        });
+                                                    });
+                                                });
+                                                if (fallback.length) netIssueRows = [...netIssueRows, ...fallback].slice(0, netIssueTarget);
+                                            }
+                                            const netIssueLabel = c.netDiff ? 'Diferencias' : 'Sin diferencia neta';
+                                            const netIssueTableRows = netIssueRows.map((x, i) => {
+                                                const mes = x.monthLabel || peopleBridge.labels.current || '-';
+                                                const scopeTxt = `${x.row.e || 'EMPRESA'} ${x.row.pa || ''}`.trim();
+                                                const motivo = x.detail || (x.kind === 'SOBRA EN HC NETO'
+                                                    ? `ESTA DE MAS EN PLANILLA CONSOLIDADA / HC NETO EN ${scopeTxt}. Revisar si esta de baja de mas en Bajas.`
+                                                    : x.kind === 'FALTA EN HC NETO'
+                                                        ? `FALTA EN PLANILLA CONSOLIDADA / HC NETO EN ${scopeTxt}. Revisar altas del mes.`
+                                                        : '-');
+                                                const search = `${x.row.c || ''} ${x.row.n || ''} ${mes} ${motivo}`.toLowerCase();
+                                                return `<tr data-search="${search}">
+                                                  <td style="padding:10px 12px;font-weight:900;color:#334155;white-space:nowrap;">${x.row.pa || '-'}</td>
+                                                  <td style="padding:10px 12px;font-weight:900;color:#334155;white-space:nowrap;">${x.row.e || '-'}</td>
+                                                  <td style="padding:10px 12px;font-weight:900;color:#334155;white-space:nowrap;">${x.row.c || '-'}</td>
+                                                  <td style="padding:10px 12px;font-weight:900;color:#0f172a;">${x.row.n || '-'}</td>
+                                                  <td style="padding:10px 12px;font-weight:800;color:#6366f1;white-space:nowrap;">${mes}</td>
+                                                  <td style="padding:10px 12px;color:#475569;font-weight:750;line-height:1.35;">${motivo}</td>
+                                                </tr>`;
+                                            }).join('');
+const rowHtml = (items) => items.length ? items.map((x) => {
                                                 const isBad = x.kind.includes('DESAPARECE') || x.kind.includes('FALTA');
                                                 const tone = isBad ? 'danger' : 'warn';
-                                                return `<article class="audit-person-card ${tone}">
+                                            return `<article class="audit-person-card ${tone}">
                                                   <div class="audit-person-status">
                                                     <span class="audit-issue-pill ${tone}">${x.kind}</span>
                                                     <span class="audit-code">${x.row.c || '-'}</span>
@@ -1986,31 +2042,31 @@ function mapGetStyle(p) {
                                                   <small>Dashboard</small>
                                                 </div>
                                               </div>
-
-                                              <div class="audit-balance-grid">
-                                                <div class="audit-balance-card danger">
-                                                  <div class="audit-balance-head"><span>Faltan / desaparecen</span><strong>${c.missing}</strong></div>
-                                                  <div class="audit-bar"><i style="width:${Math.round((c.missing / maxIssue) * 100)}%;"></i></div>
-                                                  <p>${c.disappearedNoBaja} sin baja encontrada y ${c.bajaFueraPuente || 0} con baja fuera del puente.</p>
+                                              <div id="auditPeopleIssues" class="audit-net-table-card" style="background:#fff;border:1px solid rgba(99,102,241,0.14);border-radius:14px;padding:14px;box-shadow:0 10px 24px rgba(15,23,42,0.05);">
+                                                <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap;">
+                                                  <div>
+                                                    <div style="font-size:11px;font-weight:1000;color:#6366f1;text-transform:uppercase;letter-spacing:.6px;">${netIssueLabel}</div>
+                                                    <div style="font-family:'Montserrat';font-size:18px;font-weight:1000;color:#0f172a;">Total: ${netIssueRows.length}</div>
+                                                  </div>
+                                                  <span style="font-size:11px;font-weight:900;color:#64748b;background:#f8fafc;border-radius:999px;padding:6px 10px;">${peopleBridge.labels.current}</span>
                                                 </div>
-                                                <div class="audit-balance-card warn">
-                                                  <div class="audit-balance-head"><span>Sobran / siguen activos</span><strong>${c.extra}</strong></div>
-                                                  <div class="audit-bar"><i style="width:${Math.round((c.extra / maxIssue) * 100)}%;"></i></div>
-                                                  <p>${c.bajaStillActive} tienen baja, pero siguen dentro del HC neto.</p>
-                                                </div>
+                                                <table class="audit-table" style="width:100%;border-collapse:collapse;font-size:12px;">
+                                                  <thead>
+                                                    <tr style="background:#f8fafc;border-bottom:1px solid #e2e8f0;">
+                                                      <th style="padding:9px 12px;text-align:left;color:#64748b;font-size:10px;text-transform:uppercase;">Pais</th>
+                                                      <th style="padding:9px 12px;text-align:left;color:#64748b;font-size:10px;text-transform:uppercase;">Empresa</th>
+                                                      <th style="padding:9px 12px;text-align:left;color:#64748b;font-size:10px;text-transform:uppercase;">Codigo</th>
+                                                      <th style="padding:9px 12px;text-align:left;color:#64748b;font-size:10px;text-transform:uppercase;">Nombre</th>
+                                                      <th style="padding:9px 12px;text-align:left;color:#64748b;font-size:10px;text-transform:uppercase;">Mes</th>
+                                                      <th style="padding:9px 12px;text-align:left;color:#64748b;font-size:10px;text-transform:uppercase;">Motivo</th>
+                                                    </tr>
+                                                  </thead>
+                                                  <tbody>
+                                                    ${netIssueTableRows || '<tr><td colspan="6" style="padding:18px;text-align:center;color:#64748b;font-weight:900;">Sin personas para mostrar con el filtro actual.</td></tr>'}
+                                                  </tbody>
+                                                </table>
                                               </div>
-
-                                              <div id="auditPeopleIssues" class="audit-issue-grid">
-                                                <div class="audit-issue-panel">
-                                                  <div class="audit-panel-title"><span>Personas que faltan</span><b>${missingList.length}</b></div>
-                                                  <div class="audit-people-list">${rowHtml(missingList)}</div>
-                                                </div>
-                                                <div class="audit-issue-panel">
-                                                  <div class="audit-panel-title"><span>Personas que sobran</span><b>${extraList.length}</b></div>
-                                                  <div class="audit-people-list">${rowHtml(extraList)}</div>
-                                                </div>
-                                              </div>
-                                            </section>`;
+</section>`;
                                         })() : '';
                                         tableEl.innerHTML = bridgeHtml + `
                                         <details class="audit-raw-details">
@@ -2478,6 +2534,9 @@ function mapGetStyle(p) {
 
 
 
+
+
+
 /* ===== hc-controls.js ===== */
 // Headcount control helpers extracted from the main HTML.
 
@@ -2612,6 +2671,7 @@ function personKey(row) {
                 const btn6 = document.getElementById('btnHC6m');
                 const btn12 = document.getElementById('btnHC12m');
                 const btnAnio = document.getElementById('btnHCanio');
+                if (btnAnio) btnAnio.innerHTML = '1 A&Ntilde;O';
                 const currLen = window._hcViewLength || 6;
                 const isMirror = !!window._hcMirrorMode;
 
@@ -4401,7 +4461,18 @@ function kpiCard(label, val, icon, color, view, statusType = "up", subLabel = ""
                         return !isBaja;
                     });
 
-                    const tenures = activeEmpsForTenure.map(e => ({ ...e, tenure: e.t || 0 }));
+                    const calcTenureSafe = (emp) => {
+                        if (!emp) return 0;
+                        const rawTenure = Number(emp.t ?? emp.tenure ?? emp.antiguedad ?? emp.antiguedad_anios ?? emp.anios_antiguedad ?? 0);
+                        if (Number.isFinite(rawTenure) && rawTenure > 0) return rawTenure;
+                        const hireDate = emp.fi || emp.fecha_ingreso || emp.fechaIngreso || emp.ingreso || emp.f_ingreso || emp.hireDate;
+                        if (hireDate && typeof calcTenure === 'function') {
+                            const parsed = Number(calcTenure(hireDate));
+                            if (Number.isFinite(parsed) && parsed > 0) return parsed;
+                        }
+                        return 0;
+                    };
+                    const tenures = activeEmpsForTenure.map(e => ({ ...e, tenure: calcTenureSafe(e) }));
 
                     try {
                         renderExecutiveCharts(tenures, y, m, hiresSet, uniqueEmps, empsRaw, activeHC, bajasPeriod, filteredBajas);
@@ -4972,15 +5043,18 @@ function kpiCard(label, val, icon, color, view, statusType = "up", subLabel = ""
                                         datasets: [{
                                             data: values,
                                             backgroundColor: colors,
-                                            borderWidth: 2,
-                                            borderColor: '#fff',
-                                            hoverOffset: 15
+                                            borderWidth: 4,
+                                            borderColor: '#ffffff',
+                                            hoverBorderWidth: 5,
+                                            hoverBorderColor: '#ffffff',
+                                            hoverOffset: 18,
+                                            spacing: 3
                                         }]
                                     },
                                     options: {
                                         responsive: true,
                                         maintainAspectRatio: false,
-                                        cutout: '60%',
+                                        cutout: '66%',
                                         layout: {
                                             padding: 20
                                         },
@@ -4994,7 +5068,7 @@ function kpiCard(label, val, icon, color, view, statusType = "up", subLabel = ""
                                                     return (val / total) > 0.04; // Umbral del 4% para mostrar etiqueta
                                                 },
                                                 color: '#fff',
-                                                font: { weight: '900', size: 11, family: "'Montserrat', sans-serif" }, 
+                                                font: { weight: '1000', size: 14, family: "'Montserrat', sans-serif" }, 
                                                 textShadowBlur: 4,
                                                 textShadowColor: 'rgba(0,0,0,0.4)',
                                                 formatter: (val, ctx) => {
@@ -5027,12 +5101,12 @@ function kpiCard(label, val, icon, color, view, statusType = "up", subLabel = ""
                                 
                                 return `
                                     <div class="dist-card-premium" style="display:flex; align-items:center; gap:15px; padding:10px 0; border-bottom:1px solid rgba(0,0,0,0.05); animation: fadeInRight 0.5s ease both ${idx * 0.05}s;">
-                                        <div style="width:4px; height:45px; background:${st.color}; border-radius:10px;"></div>
+                                        <div style="width:6px; height:52px; background:${st.color}; border-radius:12px; box-shadow:0 8px 18px ${st.color}33;"></div>
                                         <div style="flex:1; min-width:0;">
                                             <div style="font-size:13px; font-weight:1000; color:#64748b; text-transform:uppercase; letter-spacing:0.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${fullName}</div>
                                             <div style="display:flex; align-items:baseline; gap:6px; margin-top:2px;">
                                                 <span style="font-size:22px; font-weight:1000; color:#1e293b; line-height:1;">${val.toLocaleString()}</span>
-                                                <span style="font-size:9px; font-weight:800; color:#94a3b8; text-transform:uppercase;">COLABORADORES</span>
+                                                <span style="font-size:9px; font-weight:800; color:#94a3b8; text-transform:uppercase;">COLABORADORES</span><span class="dist-card-pct">${pct}%</span>
                                             </div>
                                         </div>
                                     </div>
@@ -7001,7 +7075,7 @@ ${buildInsetCard('TT', 'Trinidad & Tobago', 'tt', 730, 390, null, null)}
 
                 // F.2 TOP 5 AntigÃ¼edad
                 const topAntRows = [...tenures].sort((a, b) => b.tenure - a.tenure).slice(0, 5);
-                const antList = document.getElementById('topAntiquityList');
+                const antList = document.getElementById('topAntiquityList') || document.getElementById('tenureRankingList');
                 if (antList) {
                     antList.innerHTML = topAntRows.map((e, i) => {
                         const st = getStyle(e.pa);
@@ -7256,37 +7330,67 @@ ${buildInsetCard('TT', 'Trinidad & Tobago', 'tt', 730, 390, null, null)}
             function renderHeatmap(emps) {
                 const container = document.getElementById('regionalHeatmap');
                 if (!container) return;
-
-                const sourceEmps = emps || (cachedEmps ? cachedEmps.unique : []);
-                if (sourceEmps.length === 0) {
-                    container.innerHTML = `<div style="text-align:center; padding:40px; color:#94a3b8;">Sin datos de puestos</div>`;
+                const f = (typeof getFilters === 'function') ? getFilters() : {};
+                const sourceEmps = emps || (cachedEmps ? cachedEmps.unique : []) || [];
+                const mode = window._flagMode || 'hc';
+                const hcType = window._hcType || 'neto';
+                const isAllMonth = f.m === 'ALL' || f.m === '0' || f.m === 0 || f.m == null;
+                const targetY = parseInt(f.y || f.yc || new Date().getFullYear());
+                const targetM = (typeof normalizeMonth === 'function') ? normalizeMonth(f.m || f.mc || 0) : parseInt(f.m || f.mc || 0);
+                const matchBase = (row) => {
+                    const pa = row._pa || (typeof normalizePa === 'function' ? normalizePa(row.pa) : row.pa);
+                    const emp = (row.e || '').toUpperCase().trim();
+                    const area = (row.dir || row.area || '').toUpperCase().trim();
+                    const dept = (row.d || row.depto || '').toUpperCase().trim();
+                    const matchP = !f.countries || f.countries.length === 0 || f.countries.includes(pa);
+                    const matchE = !f.e || f.e === 'ALL' || emp === String(f.e || '').toUpperCase().trim();
+                    const matchA = !f.a || f.a === 'ALL' || area === String(f.a || '').toUpperCase().trim();
+                    const matchD = !f.d || f.d === 'ALL' || dept === String(f.d || '').toUpperCase().trim();
+                    return matchP && matchE && matchA && matchD;
+                };
+                let sourceRows = sourceEmps;
+                let metricLabel = hcType === 'bruto' ? 'HC BRUTO' : 'HC NETO';
+                if (mode === 'altas') {
+                    const allEmployees = window.allEmployees || window.employees || window.app?.employees || app?.employees || [];
+                    sourceRows = allEmployees.filter(e => {
+                        const yy = parseInt(e._fiY || e.yi || e.y || 0);
+                        const mm = parseInt(e._fiM || e.mi || e.m || 0);
+                        return matchBase(e) && (!targetY || yy === targetY) && (isAllMonth || mm === targetM);
+                    });
+                    metricLabel = 'ALTAS';
+                } else if (mode === 'bajas') {
+                    const allBajas = window.allBajas || window.app?.bajas_list || app?.bajas_list || [];
+                    sourceRows = allBajas.filter(b => {
+                        const yy = parseInt(b._y || b.y || 0);
+                        const mm = (typeof normalizeMonth === 'function') ? normalizeMonth(b._m || b.m) : parseInt(b._m || b.m || 0);
+                        return matchBase(b) && (!targetY || yy === targetY) && (isAllMonth || mm === targetM);
+                    });
+                    metricLabel = 'BAJAS';
+                }
+                const totalEl = document.getElementById('positionDensityTotal');
+                if (sourceRows.length === 0) {
+                    if (totalEl) totalEl.innerHTML = '<span>0</span><small>' + metricLabel + '</small>';
+                    container.innerHTML = '<div style="text-align:center; padding:40px; color:#94a3b8; font-weight:900;">Sin datos de puestos</div>';
                     return;
                 }
-
                 const showAll = document.getElementById('chkShowAllPos')?.checked || false;
                 const counts = {};
-                sourceEmps.forEach(e => {
-                    const p = (e.p || 'Sin Puesto').trim().toUpperCase();
+                sourceRows.forEach(e => {
+                    const p = (e.p || e.puesto || e.posicion || 'Sin Puesto').trim().toUpperCase();
                     counts[p] = (counts[p] || 0) + 1;
                 });
-
+                const total = Object.values(counts).reduce((a, b) => a + b, 0);
+                if (totalEl) totalEl.innerHTML = '<span>' + total.toLocaleString() + '</span><small>' + metricLabel + '</small>';
                 let sorted = Object.entries(counts).map(([name, hc]) => ({ name, hc })).sort((a, b) => b.hc - a.hc);
-                if (!showAll) sorted = sorted.slice(0, 10); // Match UI to show a few but big
-
-                container.innerHTML = `
-                    <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:15px; width:100%;">
-                        ${sorted.map((s, i) => {
-                    const op = i === 0 ? 0.9 : Math.max(0.1, 0.4 - (i * 0.04));
+                if (!showAll) sorted = sorted.slice(0, 10);
+                const maxVal = sorted[0]?.hc || 1;
+                container.innerHTML = '<div class="position-density-grid" style="display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap:14px; width:100%;">' + sorted.map(function(s, i) {
+                    const ratio = Math.max(0.18, s.hc / maxVal);
+                    const bg = i === 0 ? 'linear-gradient(135deg,#7c3aed,#a855f7)' : 'linear-gradient(135deg,rgba(139,92,246,' + (0.12 + ratio * 0.32) + '),rgba(59,130,246,' + (0.08 + ratio * 0.22) + '))';
+                    const color = i === 0 ? '#fff' : '#1e293b';
                     const isFull = i === sorted.length - 1 && sorted.length % 3 !== 0;
-                    return `
-                                <div style="grid-column: ${isFull ? '1 / -1' : 'auto'}; background:rgba(139, 92, 246, ${op}); color:${i === 0 ? '#fff' : '#1e293b'}; padding:22px; border-radius:16px; text-align:center; transition:0.3s; box-shadow:0 4px 12px rgba(139, 92, 246, 0.1); border:1px solid rgba(139, 92, 246, 0.2);">
-                                    <div style="font-size:26px; font-weight:1000; margin-bottom:4px;">${s.hc}</div>
-                                    <div style="font-size:9px; font-weight:900; text-transform:uppercase; opacity:0.8; letter-spacing:0.5px;">${s.name}</div>
-                                </div>
-                            `;
-                }).join('')}
-                    </div>
-                `;
+                    return '<div style="grid-column:' + (isFull ? '1 / -1' : 'auto') + '; background:' + bg + '; color:' + color + '; padding:18px 16px; border-radius:14px; text-align:left; transition:0.3s; box-shadow:0 10px 22px rgba(99,102,241,0.10); border:1px solid rgba(139,92,246,0.18); min-height:92px; display:flex; flex-direction:column; justify-content:space-between;"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;"><span style="font-size:27px; font-weight:1000; line-height:1;">' + s.hc.toLocaleString() + '</span><span style="font-size:10px;font-weight:1000;opacity:.78;">' + ((s.hc / total) * 100).toFixed(0) + '%</span></div><div style="font-size:10px; font-weight:1000; text-transform:uppercase; opacity:0.84; letter-spacing:0; line-height:1.25;">' + s.name + '</div></div>';
+                }).join('') + '</div>';
             }
 
 
@@ -8044,7 +8148,7 @@ function renderSubActives() {
 
 
 /* ===== headcount-advanced.js ===== */
-// Advanced Headcount helpers extracted from the main HTML.
+﻿// Advanced Headcount helpers extracted from the main HTML.
 
 function renderHCRegistry(emps) {
                 const tbody = document.getElementById('tbodyHCReg');
@@ -8148,8 +8252,8 @@ function renderHCRegistry(emps) {
                 ${kpiCard("HEADCOUNT HC", totalHC.toLocaleString(), " ", "#8b5cf6", "Actual en periodo", "up", "", null, "", "", null, "15px")}
                 ${kpiCard("Movimientos: Altas vs Bajas", `${totalHires} / ${totalBajas}`, " ", "#10b981", "Altas: " + totalHires + " / Bajas: " + totalBajas, "up", "", null, "", "", null, "13px")}
                 ${kpiCard("Bajas Totales", totalBajas.toLocaleString(), " ", "#ef4444", "Salidas del periodo", "down", "", null, "", "", null, "13px")}
-                ${kpiCard("Retención & Rotación", `${retentionRate}% / ${rotationRate}%`, "  ", "#f59e0b", "Índice vs Bajas", "up", "", null, "", "", null, "13px")}
-                ${kpiCard("Países Activos", activeCountriesCount, " ", "#6366f1", "Alcance Regional", "up", "", null, "", "", null, "13px")}
+                ${kpiCard("RetenciÃ³n & RotaciÃ³n", `${retentionRate}% / ${rotationRate}%`, "  ", "#f59e0b", "Ãndice vs Bajas", "up", "", null, "", "", null, "13px")}
+                ${kpiCard("PaÃ­ses Activos", activeCountriesCount, " ", "#6366f1", "Alcance Regional", "up", "", null, "", "", null, "13px")}
                     `;
 
                 const chartColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#06b6d4', '#84cc16'];
@@ -8199,7 +8303,7 @@ function renderHCRegistry(emps) {
                     }
                 }));
 
-                // Chart 3: Antigüedad (Donut)
+                // Chart 3: Antiguedad (Donut)
                 const ten = { '< 1 a ': 0, '1-3 a ': 0, '3-5 a ': 0, '5-10 a ': 0, '10+ a ': 0 };
                 uniqueEmps.forEach(e => {
                     const t = calcTenure(e.fi);
@@ -8212,7 +8316,7 @@ function renderHCRegistry(emps) {
                     }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { family: 'Montserrat', size: 10 } } } } }
                 }));
 
-                // Chart 4: Tasa de Rotación Mensual (area)
+                // Chart 4: Tasa de RotaciÃ³n Mensual (area)
                 const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
                 const hcByMonth = Array(12).fill(0);
                 const bajasByMonth = Array(12).fill(0);
@@ -8228,7 +8332,7 @@ function renderHCRegistry(emps) {
                 window.activeCharts.push(new Chart(ctx4, {
                     type: 'line', data: {
                         labels: monthNames,
-                        datasets: [{ label: 'Rotación %', data: rotByMonth, borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.1)', tension: 0.4, fill: true, pointRadius: 4 }]
+                        datasets: [{ label: 'RotaciÃ³n %', data: rotByMonth, borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.1)', tension: 0.4, fill: true, pointRadius: 4 }]
                     }, options: {
                         responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
                         scales: { y: { beginAtZero: true, grid: { color: '#f1f5f9' } }, x: { grid: { display: false } } }
@@ -8561,7 +8665,7 @@ function openOrgChart() {
             }
         });
 
-        // --- HC DINÁMICO ---
+        // --- HC DINÃMICO ---
         window._dynChart = null;
         function updateDynOptions() {
             const dim = document.getElementById('dynDimension').value;
@@ -8578,7 +8682,7 @@ function openOrgChart() {
         function createDynChart() {
             const dim = document.getElementById('dynDimension').value;
             const selected = Array.from(document.querySelectorAll('.dyn-opt-check:checked')).map(c => c.value);
-            if (!selected.length) return Swal.fire('Error', 'Seleccione al menos una opción', 'warning');
+            if (!selected.length) return Swal.fire('Error', 'Seleccione al menos una opciÃ³n', 'warning');
             const empsSource = (window.app && window.app.employees) ? window.app.employees : (window.hcFullData || []);
             const emps = Array.isArray(empsSource) ? empsSource : (empsSource.employees || []);
             const f = typeof getFilters === 'function' ? getFilters() : { y: 'ALL', m: 'ALL' };
@@ -8818,7 +8922,7 @@ function openOrgChart() {
                             <tbody>${tableRows}</tbody>
                         </table>
                     </div>
-                    ` : '<div style="padding:60px; text-align:center;"><span style="font-size:48px;"> </span><p style="color:#94a3b8; font-size:14px; margin-top:15px;">Todos los puestos ya están clasificados correctamente.</p></div>'}
+                    ` : '<div style="padding:60px; text-align:center;"><span style="font-size:48px;"> </span><p style="color:#94a3b8; font-size:14px; margin-top:15px;">Todos los puestos ya estÃ¡n clasificados correctamente.</p></div>'}
                     <div style="padding:15px 30px; border-top:1px solid rgba(255,255,255,0.1); display:flex; justify-content:space-between; align-items:center;">
                         <span style="color:#64748b; font-size:10px;">Los cambios se guardaron en localStorage automaspan>
                         <button onclick="document.getElementById('repairLogModal').remove()" style="background:var(--ac); color:#fff; border:none; padding:10px 24px; border-radius:12px; font-weight:800; font-size:12px; cursor:pointer;">CERRAR</button>
@@ -8896,17 +9000,17 @@ function openOrgChart() {
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:25px; border-bottom:1px solid #f1f5f9; padding-bottom:15px;">
                         <div>
                             <h3 style="font-size:18px; font-weight:1000; color:#1e293b; margin:0;">   Detalle Mensual: <span style="color:var(--ac);">${mname} ${y}</span></h3>
-                            <p style="font-size:11px; color:#64748b; font-weight:700; margin-top:4px;">Análisis profundo de bajas y movimientos</p>
+                            <p style="font-size:11px; color:#64748b; font-weight:700; margin-top:4px;">Analisis profundo de bajas y movimientos</p>
                         </div>
-                        <button onclick="document.getElementById('calendarDetailRow').style.display='none'" style="background:#f1f5f9; border:none; color:#64748b; width:32px; height:32px; border-radius:50%; cursor:pointer; font-size:14px; display:flex; align-items:center; justify-content:center; transition:0.2s;" onmouseenter="this.style.background='#e2e8f0'" onmouseleave="this.style.background='#f1f5f9'"> </button>
+                        <button onclick="document.getElementById('calendarDetailRow').style.display='none'" style="background:#f1f5f9; border:none; color:#64748b; width:32px; height:32px; border-radius:50%; cursor:pointer; font-size:14px; display:flex; align-items:center; justify-content:center; transition:0.2s;" onmouseenter="this.style.background='#e2e8f0'" onmouseleave="this.style.background='#f1f5f9'">&times;</button>
                     </div>
-                    <div id="heatmapChartsGrid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:20px;">
-                        <div class="card-box" style="height:280px; background:#fff; box-shadow:none; border:1px solid #f1f5f9; padding:15px;"><canvas id="snapPa"></canvas></div>
-                        <div class="card-box" style="height:280px; background:#fff; box-shadow:none; border:1px solid #f1f5f9; padding:15px;"><canvas id="snapEmp"></canvas></div>
-                        <div class="card-box" style="height:280px; background:#fff; box-shadow:none; border:1px solid #f1f5f9; padding:15px;"><canvas id="snaparea"></canvas></div>
-                        <div class="card-box" style="height:280px; background:#fff; box-shadow:none; border:1px solid #f1f5f9; padding:15px;"><canvas id="snapDepto"></canvas></div>
-                        <div class="card-box" style="height:280px; background:#fff; box-shadow:none; border:1px solid #f1f5f9; padding:15px;"><canvas id="snapAnt"></canvas></div>
-                        <div class="card-box" style="height:280px; background:#fff; box-shadow:none; border:1px solid #f1f5f9; padding:15px;"><canvas id="snapMotivo"></canvas></div>
+                    <div id="heatmapChartsGrid" style="display:grid; grid-auto-flow:column; grid-auto-columns:minmax(300px,1fr); gap:16px; overflow-x:auto; padding-bottom:10px;">
+                        <div class="card-box" style="height:300px; min-width:300px; background:#fff; box-shadow:none; border:1px solid #e2e8f0; border-radius:14px; padding:15px;"><canvas id="snapPa"></canvas></div>
+                        <div class="card-box" style="height:300px; min-width:300px; background:#fff; box-shadow:none; border:1px solid #e2e8f0; border-radius:14px; padding:15px;"><canvas id="snapEmp"></canvas></div>
+                        <div class="card-box" style="height:300px; min-width:300px; background:#fff; box-shadow:none; border:1px solid #e2e8f0; border-radius:14px; padding:15px;"><canvas id="snaparea"></canvas></div>
+                        <div class="card-box" style="height:300px; min-width:300px; background:#fff; box-shadow:none; border:1px solid #e2e8f0; border-radius:14px; padding:15px;"><canvas id="snapDepto"></canvas></div>
+                        <div class="card-box" style="height:300px; min-width:300px; background:#fff; box-shadow:none; border:1px solid #e2e8f0; border-radius:14px; padding:15px;"><canvas id="snapAnt"></canvas></div>
+                        <div class="card-box" style="height:300px; min-width:300px; background:#fff; box-shadow:none; border:1px solid #e2e8f0; border-radius:14px; padding:15px;"><canvas id="snapMotivo"></canvas></div>
                     </div>
                 </div>
             `;
@@ -8984,7 +9088,7 @@ function openOrgChart() {
             makeChart('snapEmp', em, '  POR EMPRESA');
             makeChart('snaparea', ar, '  POR Direccion');
             makeChart('snapDepto', de, '  POR DEPARTAMENTO', 'bar');
-            makeChart('snapAnt', an, '  POR Antigüedad');
+            makeChart('snapAnt', an, '  POR Antiguedad');
             makeChart('snapMotivo', mo, '  MOTIVOS DE BAJA', 'bar');
         };
 
@@ -9059,6 +9163,11 @@ function renderRetentionHealth(uniqueEmps, y, m) {
             });
 
             const deptMap = {};
+            window._retBreakdownDim = window._retBreakdownDim || 'dir';
+            const retDimConfig = { dir:{label:'Direcci&oacute;n',key:(b)=>b.dir||b.area||'Sin Direcci&oacute;n'}, d:{label:'Departamento',key:(b)=>b.d||b.depto||'Sin Departamento'}, e:{label:'Empresa',key:(b)=>b.e||'Sin Empresa'}, pa:{label:'Pa&iacute;s',key:(b)=>(window.paisMap&&window.paisMap[b.pa])||b.pa||'Sin Pa&iacute;s'} };
+            const retDim = retDimConfig[window._retBreakdownDim] ? window._retBreakdownDim : 'dir';
+            const retDimLabel = retDimConfig[retDim].label;
+            const getRetBreakdownKey = (b) => String(retDimConfig[retDim].key(b) || 'Otros').trim().toUpperCase();
             let earlyBajas = 0;
             let midBajas = 0;
             let seniorBajas = 0;
@@ -9098,7 +9207,7 @@ function renderRetentionHealth(uniqueEmps, y, m) {
 
             // Calculate department totals from periodBajas for the stacked chart
             periodBajas.forEach(b => {
-                const dept = b.d || 'Otros';
+                const dept = getRetBreakdownKey(b);
                 if (!deptMap[dept]) deptMap[dept] = { total: 0, early: 0, mid: 0, senior: 0 };
                 deptMap[dept].total++;
 
@@ -9126,7 +9235,7 @@ function renderRetentionHealth(uniqueEmps, y, m) {
                     labels: labels,
                     datasets: [
                         { 
-                            label: '< 6 Meses (Crítico)', data: dataEarly, backgroundColor: '#ef4444', 
+                            label: '< 6 Meses (Critico)', data: dataEarly, backgroundColor: '#ef4444', 
                             datalabels: { display: (context) => context.dataset.data[context.dataIndex] > 0, color: '#fff', font: { weight: 800, size: 10 } } 
                         },
                         { 
@@ -9155,6 +9264,10 @@ function renderRetentionHealth(uniqueEmps, y, m) {
 
             // UPDATE DYNAMIC KPI CARDS (using kpiBajas)
             const totalBajas = kpiBajas.length;
+            const totalValEl = document.getElementById('retKpiTotalCount');
+            if (totalValEl) totalValEl.innerText = totalBajas.toLocaleString();
+            const totalPctEl = document.getElementById('retKpiTotalPct');
+            if (totalPctEl) totalPctEl.innerText = 'bajas en periodo';
             const earlyPctVal = totalBajas > 0 ? (earlyBajas / totalBajas * 100) : 0;
             const midPctVal = totalBajas > 0 ? (midBajas / totalBajas * 100) : 0;
             const seniorPctVal = totalBajas > 0 ? (seniorBajas / totalBajas * 100) : 0;
@@ -9244,7 +9357,7 @@ function renderRetentionHealth(uniqueEmps, y, m) {
                 if (globalIndex > 35) {
                     badgeEl.style.cssText = 'background:rgba(239, 68, 68, 0.08); color:#ef4444; border:1px solid rgba(239, 68, 68, 0.15); display:flex; align-items:center; padding:4px 10px; border-radius:30px; font-weight:900; font-size:10px; letter-spacing:0.5px;';
                     dotEl.className = 'rz-pulse-dot red';
-                    txtEl.innerText = 'CRÍTICO';
+                    txtEl.innerText = 'CRÃTICO';
                 } else if (globalIndex > 20) {
                     badgeEl.style.cssText = 'background:rgba(245, 158, 11, 0.08); color:#f59e0b; border:1px solid rgba(245, 158, 11, 0.15); display:flex; align-items:center; padding:4px 10px; border-radius:30px; font-weight:900; font-size:10px; letter-spacing:0.5px;';
                     dotEl.className = 'rz-pulse-dot orange';
@@ -9379,23 +9492,60 @@ function renderRetentionHealth(uniqueEmps, y, m) {
             const riskTotal = activeRiskScores.length || 1;
             const riskPanel = riskCanvas?.closest('.rz-chart-panel');
             const healthPanel = ctx.closest('.rz-chart-panel');
-            
-            if (riskPanel && healthPanel && riskPanel !== healthPanel.nextElementSibling) {
-                healthPanel.insertAdjacentElement('afterend', riskPanel);
-                riskPanel.style.marginTop = '0';
-                riskPanel.style.marginBottom = '25px';
-            }
+            const arrangeRetentionPanels = () => {
+                const heatPanel = document.getElementById('retentionHeatmap')?.closest('.rz-chart-panel');
+                const trendPanel = document.getElementById('chartRetentionTrend')?.closest('.rz-chart-panel');
+                const insightsPanel = document.getElementById('retentionInsights')?.closest('.rz-insights-panel');
+                const host = healthPanel?.parentElement;
+                if (!host || !healthPanel) return;
+                host.style.gridTemplateColumns = '1fr';
+                host.style.gap = '22px';
+                let heatInsightGrid = document.getElementById('retHeatInsightGrid');
+                if (!heatInsightGrid) {
+                    heatInsightGrid = document.createElement('div');
+                    heatInsightGrid.id = 'retHeatInsightGrid';
+                    heatInsightGrid.style.cssText = 'display:grid;grid-template-columns:minmax(360px,1fr) minmax(360px,1fr);gap:22px;align-items:stretch;width:100%;margin:0;';
+                }
+                healthPanel.insertAdjacentElement('afterend', heatInsightGrid);
+                if (heatPanel) {
+                    heatInsightGrid.appendChild(heatPanel);
+                    heatPanel.style.margin = '0';
+                    heatPanel.style.height = '100%';
+                }
+                if (insightsPanel) {
+                    heatInsightGrid.appendChild(insightsPanel);
+                    insightsPanel.style.margin = '0';
+                    insightsPanel.style.height = '100%';
+                    insightsPanel.style.display = 'flex';
+                    insightsPanel.style.flexDirection = 'column';
+                }
+                if (riskPanel && trendPanel) {
+                    let grid = document.getElementById('retRiskTrendGrid');
+                    if (!grid) {
+                        grid = document.createElement('div');
+                        grid.id = 'retRiskTrendGrid';
+                        grid.style.cssText = 'display:grid;grid-template-columns:minmax(360px,.96fr) minmax(420px,1.04fr);gap:22px;align-items:stretch;width:100%;margin:0;padding:18px;border-radius:18px;background:linear-gradient(135deg,#ffffff,#f8fafc);border:1px solid rgba(148,163,184,0.18);box-shadow:0 16px 34px rgba(15,23,42,0.06);';
+                    }
+                    (heatInsightGrid || healthPanel).insertAdjacentElement('afterend', grid);
+                    grid.appendChild(riskPanel);
+                    grid.appendChild(trendPanel);
+                    riskPanel.style.margin = '0';
+                    trendPanel.style.margin = '0';
+                    riskPanel.style.height = '100%';
+                    trendPanel.style.height = '100%';
+                }
+            };
             
             const riskTitle = riskPanel?.querySelector('.rz-chart-title');
             if (riskTitle) {
-                riskTitle.innerHTML = `<span style="display:flex;flex-direction:column;gap:3px;"><span style="display:flex;align-items:center;gap:9px;color:#0f172a;font-size:16px;font-weight:1000;text-transform:uppercase;"><i class="fa-solid fa-circle-nodes" style="color:#8b5cf6;"></i> Distribucion de Riesgo de Salida</span><small style="font-size:11px;color:#64748b;font-weight:1000;text-transform:none;">${retRangeLabel}</small></span><span class="rz-chart-total" style="background:#f5f3ff;color:#7c3aed;border:1px solid rgba(139,92,246,0.18);"><i class="fa-solid fa-users"></i> ${riskTotal.toLocaleString()} evaluados</span>`;
+                riskTitle.innerHTML = `<span style="display:flex;flex-direction:column;gap:3px;"><span style="display:flex;align-items:center;gap:9px;color:#0f172a;font-size:16px;font-weight:1000;text-transform:uppercase;"><i class="fa-solid fa-circle-nodes" style="color:#8b5cf6;"></i> DistribuciÃ³n de Riesgo de Salida</span><small style="font-size:11px;color:#64748b;font-weight:1000;text-transform:none;">${retRangeLabel}</small></span><span class="rz-chart-total" style="background:#f5f3ff;color:#7c3aed;border:1px solid rgba(139,92,246,0.18);"><i class="fa-solid fa-users"></i> ${riskTotal.toLocaleString()} evaluados</span>`;
             }
             
             if (riskPanel) {
                 riskPanel.style.padding = '18px 22px';
             }
 
-            // Actualizar score promedio central con animación de conteo
+            // Actualizar score promedio central con animaciÃ³n de conteo
             const avgValEl = document.getElementById('retRiskAvgVal');
             if (avgValEl) {
                 const targetVal = avgRiskScore;
@@ -9423,7 +9573,7 @@ function renderRetentionHealth(uniqueEmps, y, m) {
                 let scoreBg = '#ecfdf5';
                 let scoreBorder = 'rgba(16,185,129,0.15)';
                 if (avgRiskScore > 80) {
-                    scoreLabel = 'Crítico';
+                    scoreLabel = 'Critico';
                     scoreColor = '#ef4444';
                     scoreBg = '#fef2f2';
                     scoreBorder = 'rgba(239,68,68,0.15)';
@@ -9465,10 +9615,10 @@ function renderRetentionHealth(uniqueEmps, y, m) {
                 }
             };
 
-            // Inyectar barras de progreso a la derecha con animación e interacciones
+            // Inyectar barras de progreso a la derecha con animaciÃ³n e interacciones
             const detailsCol = document.getElementById('retRiskDetailsCol');
             if (detailsCol) {
-                const labelMap = { '0-20': 'Estable', '20-40': 'Bajo', '40-60': 'Medio', '60-80': 'Alto', '80-100': 'Crítico' };
+                const labelMap = { '0-20': 'Estable', '20-40': 'Bajo', '40-60': 'Medio', '60-80': 'Alto', '80-100': 'Critico' };
                 const colorMap = { '0-20': '#10b981', '20-40': '#3b82f6', '40-60': '#f59e0b', '60-80': '#f97316', '80-100': '#ef4444' };
                 const bgMap = { '0-20': 'rgba(16,185,129,0.06)', '20-40': 'rgba(59,130,246,0.06)', '40-60': 'rgba(245,158,11,0.06)', '60-80': 'rgba(249,115,22,0.06)', '80-100': 'rgba(239,68,68,0.06)' };
                 const gradientMap = {
@@ -9510,7 +9660,7 @@ function renderRetentionHealth(uniqueEmps, y, m) {
                     type: 'doughnut',
                     plugins: [ChartDataLabels],
                     data: {
-                        labels: ['Estable', 'Bajo', 'Medio', 'Alto', 'Crítico'],
+                        labels: ['Estable', 'Bajo', 'Medio', 'Alto', 'Critico'],
                         datasets: [{
                             data: [buckets['0-20'], buckets['20-40'], buckets['40-60'], buckets['60-80'], buckets['80-100']],
                             backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#f97316', '#ef4444'],
@@ -9568,7 +9718,7 @@ function renderRetentionHealth(uniqueEmps, y, m) {
             let heatHtml = `<table class="rz-heatmap-table">
                 <thead>
                     <tr>
-                        <th style="color:#64748b; text-align:left;">Dpto</th>`;
+                        <th style="color:#64748b; text-align:left;">Dimension</th>`;
             heatMonths.forEach(hm => {
                 heatHtml += `<th style="color:#64748b; text-align:center;">${hm.label}</th>`;
             });
@@ -9591,20 +9741,17 @@ function renderRetentionHealth(uniqueEmps, y, m) {
                     
                     let cellBg = 'rgba(16, 185, 129, 0.15)';
                     let cellColor = '#10b981';
-                    let cellIcon = '🟢';
                     if (val >= 3) {
                         cellBg = 'rgba(239, 68, 68, 0.15)';
                         cellColor = '#ef4444';
-                        cellIcon = '🔴';
                     } else if (val === 2) {
                         cellBg = 'rgba(59, 130, 246, 0.15)';
                         cellColor = '#3b82f6';
-                        cellIcon = '🔵';
                     }
                     
                     heatHtml += `<td style="text-align:center;">
                         <div class="rz-heatmap-cell" style="background:${cellBg}; color:${cellColor}; font-size:9.5px; font-weight:800; display:inline-block; min-width:32px; padding:2px 4px; border-radius:4px;" title="Bajas: ${val}">
-                            ${cellIcon} ${val}
+                            ${val}
                         </div>
                     </td>`;
                 });
@@ -9618,6 +9765,7 @@ function renderRetentionHealth(uniqueEmps, y, m) {
             heatHtml += `</tbody></table>`;
             const hmContainer = document.getElementById('retentionHeatmap');
             if (hmContainer) hmContainer.innerHTML = heatHtml;
+            arrangeRetentionPanels();
 
             // EXECUTIVE ACTION INSIGHTS ENGINE
             let insightsHtml = '';
@@ -9636,8 +9784,8 @@ function renderRetentionHealth(uniqueEmps, y, m) {
                 <div class="rz-insight-card">
                     <div class="rz-insight-icon" style="background:rgba(239,68,68,0.08); color:#ef4444;"><i class="fa-solid fa-circle-exclamation"></i></div>
                     <div class="rz-insight-text">
-                        <div class="rz-insight-title">Rotación Temprana Crítica</div>
-                        <div class="rz-insight-desc">${periodEarlyBajas} empleados con &lt;6 meses dejaron la empresa (${periodEarlyPct.toFixed(1)}% del total). Acción: Revisar onboarding y selección.</div>
+                        <div class="rz-insight-title">RotaciÃ³n Temprana CrÃ­tica</div>
+                        <div class="rz-insight-desc">${periodEarlyBajas} empleados con &lt;6 meses dejaron la empresa (${periodEarlyPct.toFixed(1)}% del total). AcciÃ³n: Revisar onboarding y selecciÃ³n.</div>
                     </div>
                 </div>`;
             } else {
@@ -9645,8 +9793,8 @@ function renderRetentionHealth(uniqueEmps, y, m) {
                 <div class="rz-insight-card">
                     <div class="rz-insight-icon" style="background:rgba(16,185,129,0.08); color:#10b981;"><i class="fa-solid fa-circle-check"></i></div>
                     <div class="rz-insight-text">
-                        <div class="rz-insight-title">Retención Temprana Estable</div>
-                        <div class="rz-insight-desc">No se registran fugas de talento en sus primeros 6 meses. Mantener políticas de inducción.</div>
+                        <div class="rz-insight-title">RetenciÃ³n Temprana Estable</div>
+                        <div class="rz-insight-desc">No se registran fugas de talento en sus primeros 6 meses. Mantener polÃ­ticas de inducciÃ³n.</div>
                     </div>
                 </div>`;
             }
@@ -9658,7 +9806,7 @@ function renderRetentionHealth(uniqueEmps, y, m) {
                     <div class="rz-insight-icon" style="background:rgba(239,68,68,0.08); color:#ef4444;"><i class="fa-solid fa-gauge-high"></i></div>
                     <div class="rz-insight-text">
                         <div class="rz-insight-title">Tasa Churn Elevada</div>
-                        <div class="rz-insight-desc">Churn promedio de ${churnVal.toFixed(1)}% mensual (benchmark ideal: &lt;1.5%). Acción: Ejecutar plan de contención.</div>
+                        <div class="rz-insight-desc">Churn promedio de ${churnVal.toFixed(1)}% mensual (benchmark ideal: &lt;1.5%). AcciÃ³n: Ejecutar plan de contenciÃ³n.</div>
                     </div>
                 </div>`;
             } else {
@@ -9683,8 +9831,8 @@ function renderRetentionHealth(uniqueEmps, y, m) {
                 <div class="rz-insight-card">
                     <div class="rz-insight-icon" style="background:rgba(139,92,246,0.08); color:#8b5cf6;"><i class="fa-solid fa-chart-line"></i></div>
                     <div class="rz-insight-text">
-                        <div class="rz-insight-title">Dirección de Mayor Impacto</div>
-                        <div class="rz-insight-desc">El departamento <strong>${worstName}</strong> concentra la mayor fuga con ${worstCount} bajas críticas en el periodo. Se sugiere diagnóstico de clima laboral.</div>
+                        <div class="rz-insight-title">DirecciÃ³n de Mayor Impacto</div>
+                        <div class="rz-insight-desc">El departamento <strong>${worstName}</strong> concentra la mayor fuga con ${worstCount} bajas crÃ­ticas en el periodo. Se sugiere diagnÃ³stico de clima laboral.</div>
                     </div>
                 </div>`;
             }
@@ -9695,8 +9843,8 @@ function renderRetentionHealth(uniqueEmps, y, m) {
                 <div class="rz-insight-card">
                     <div class="rz-insight-icon" style="background:rgba(59,130,246,0.08); color:#3b82f6;"><i class="fa-solid fa-hand-holding-dollar"></i></div>
                     <div class="rz-insight-text">
-                        <div class="rz-insight-title">Oportunidad ROI de Retención</div>
-                        <div class="rz-insight-desc">Retener el 30% de fugas críticas ahorraría aprox. Q${savings.toLocaleString()} en costos de reemplazo.</div>
+                        <div class="rz-insight-title">Oportunidad ROI de RetenciÃ³n</div>
+                        <div class="rz-insight-desc">Retener el 30% de fugas crÃ­ticas ahorrarÃ­a aprox. Q${savings.toLocaleString()} en costos de reemplazo.</div>
                     </div>
                 </div>`;
             }
@@ -9748,11 +9896,11 @@ function updateInsightsSummaryText(earlyBajas, totalBajas, top5Depts, avgRiskSco
     
     let advice = 'Se observa estabilidad general en el periodo analizado.';
     if (earlyPct > 35) {
-        advice = `⚠️ Alerta de Rotación Temprana: La fuga de personal en sus primeros 6 meses representa el ${earlyPct}% de las bajas. Se requiere intervención en selección y onboarding para los departamentos de ${deptsStr}.`;
+        advice = `âš ï¸ Alerta de RotaciÃ³n Temprana: La fuga de personal en sus primeros 6 meses representa el ${earlyPct}% de las bajas. Se requiere intervenciÃ³n en selecciÃ³n y onboarding para los departamentos de ${deptsStr}.`;
     } else if (earlyPct > 20) {
-        advice = `📈 Nivel de Riesgo Medio: Se detecta un ${earlyPct}% de bajas prematuras. Se sugiere implementar entrevistas de permanencia en las áreas críticas de ${deptsStr}.`;
+        advice = `ðŸ“ˆ Nivel de Riesgo Medio: Se detecta un ${earlyPct}% de bajas prematuras. Se sugiere implementar entrevistas de permanencia en las Ã¡reas crÃ­ticas de ${deptsStr}.`;
     } else if (totalBajas > 0) {
-        advice = `✅ Retención Óptima: La rotación temprana está bajo control (${earlyPct}%). Foco principal en retención de mandos medios.`;
+        advice = `âœ… RetenciÃ³n Ã“ptima: La rotaciÃ³n temprana estÃ¡ bajo control (${earlyPct}%). Foco principal en retenciÃ³n de mandos medios.`;
     }
     
     textEl.innerHTML = `
@@ -9785,21 +9933,49 @@ window.toggleInsightsSummary = function() {
 
 function renderTenureThermometer(uniqueEmps) {
             const listEl = document.getElementById('tenureRankingList');
-            if (!listEl) return;
+
+            const tenureRows = (uniqueEmps && uniqueEmps.length ? uniqueEmps : (window.lastActiveHC || (window.app && window.app.employees) || (window.hcFullData && window.hcFullData.employees) || []));
+            const getHireDateStr = (e) => e && (
+                e.fi || e.f_ing || e.fecha_ingreso || e.fechaIngreso || e.fecha_alta || e.fechaAlta ||
+                e.fechadeingreso || e['FECHA INGRESO'] || e['Fecha Ingreso'] || e['FECHA DE INGRESO'] ||
+                (e._fiY && e._fiM ? `${e._fiY}-${String(e._fiM).padStart(2, '0')}-01` : '')
+            ) || '';
+            const getTenureVal = (e) => {
+                const hireDateStr = getHireDateStr(e);
+                const fromDate = (typeof calcTenure === 'function') ? Number(calcTenure(hireDateStr)) : 0;
+                if (Number.isFinite(fromDate) && fromDate > 0) return fromDate;
+                if (hireDateStr) {
+                    const parts = String(hireDateStr).trim().split(/[\/-]/).map(Number);
+                    let d = null;
+                    if (parts.length === 3 && parts.every(Number.isFinite)) {
+                        d = String(parts[0]).length === 4 ? new Date(parts[0], parts[1] - 1, parts[2]) : new Date(parts[2], parts[1] - 1, parts[0]);
+                    }
+                    if (d && !isNaN(d)) {
+                        const years = (Date.now() - d.getTime()) / 31557600000;
+                        if (years > 0 && years < 80) return years;
+                    }
+                }
+                const raw = Number(e && (e.t || e.tenure || e.antiguedad || e.antiguedad_anios || e.anios_antiguedad));
+                return raw > 0 ? raw : 0;
+            };
 
             const deptMap = {};
             let totalTenure = 0;
-            uniqueEmps.forEach(e => {
+            let validTenureCount = 0;
+            tenureRows.forEach(e => {
                 const dept = e.d || 'Otros';
                 if (!deptMap[dept]) deptMap[dept] = { total: 0, sum: 0 };
-                deptMap[dept].total++;
-                const hireDateStr = e.fi || e.fechadeingreso || e.fecha_ingreso || '';
-                const tVal = (typeof calcTenure === 'function') ? calcTenure(hireDateStr) : 0;
-                deptMap[dept].sum += tVal;
-                totalTenure += tVal;
+                const tVal = getTenureVal(e);
+                if (tVal > 0) {
+                    deptMap[dept].total++;
+                    deptMap[dept].sum += tVal;
+                    totalTenure += tVal;
+                    validTenureCount++;
+                }
             });
 
             const sorted = Object.entries(deptMap)
+                .filter(([, data]) => data.total > 0)
                 .map(([name, data]) => ({ name, avg: data.sum / data.total }))
                 .sort((a,b) => b.avg - a.avg);
 
@@ -9819,18 +9995,19 @@ function renderTenureThermometer(uniqueEmps) {
                     </div>
                 `;
             });
-            listEl.innerHTML = html;
+            if (listEl) listEl.innerHTML = html || '<div style="padding:22px;text-align:center;color:#94a3b8;font-size:12px;font-weight:900;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:14px;">Sin fechas de ingreso vÃ¡lidas para calcular Antiguedad.</div>';
 
-            const globalAvg = uniqueEmps.length > 0 ? totalTenure / uniqueEmps.length : 0;
+            const globalAvg = validTenureCount > 0 ? totalTenure / validTenureCount : 0;
             const globEl = document.getElementById('avgTenureGlobal');
             if(globEl) {
-                globEl.innerText = globalAvg.toFixed(1);
+                globEl.innerText = validTenureCount > 0 ? globalAvg.toFixed(1) : '0.0';
             }
 
             // Tenure Dist Chart
             const dist = { '0-1': 0, '1-3': 0, '3-5': 0, '5+': 0 };
-            uniqueEmps.forEach(e => {
-                const t = (typeof calcTenure === 'function') ? calcTenure(e.fi) : 0;
+            tenureRows.forEach(e => {
+                const t = getTenureVal(e);
+                if (t <= 0) return;
                 if (t < 1) dist['0-1']++;
                 else if (t < 3) dist['1-3']++;
                 else if (t < 5) dist['3-5']++;
@@ -9859,6 +10036,8 @@ function renderTenureThermometer(uniqueEmps) {
                 });
             }
         }
+
+
 
 
 
@@ -9967,7 +10146,33 @@ function renderIncidencias() {
     window._incFilters = Object.assign({ tipo: 'ALL', sev: 'ALL', fuente: 'ALL', responsable: 'ALL', search: '', monthScope: '6m', month: 'ALL', distDim: 'dir' }, window._incFilters || {});
     const local = window._incFilters;
     const { e: emp, a, d, y: yr, m: mo, countries } = getFilters();
-    const allIncs = app.incidencias || [];
+    const allIncs = (app.incidencias && app.incidencias.length ? app.incidencias : ((window.hcFullData && window.hcFullData.incidencias && window.hcFullData.incidencias.length) ? window.hcFullData.incidencias : (app.bajas_list || app.departures || []).filter(r => r && (r.fecha_pago || r.pago_y || r.pago_m || r.mes_baja_excel)).map(r => {
+        const yy = Number(r.pago_y || r.y || 0);
+        const mm = Number(r.pago_m || r.m || 0);
+        const bajaY = Number(r.y || 0);
+        const bajaM = Number(r.m || 0);
+        const posterior = yy && mm && bajaY && bajaM && ((yy * 12 + mm) > (bajaY * 12 + bajaM));
+        return {
+            c: r.c || r.codigo || '',
+            n: r.n || r.nombre || '',
+            p: r.p || r.puesto || '',
+            pa: r.pa || r.pais || '',
+            e: r.e || r.empresa || '',
+            dir: r.dir || r.area || '',
+            d: r.d || r.depto || r.departamento || '',
+            y: yy || bajaY,
+            m: mm || bajaM,
+            f: r.fecha_pago || r.f || '',
+            sev: posterior ? 'Alta' : 'Media',
+            t: posterior ? 'Pago posterior a baja' : 'Baja con pago registrado',
+            tipo: posterior ? 'Pago posterior a baja' : 'Baja con pago registrado',
+            detalle: posterior ? `Fecha de baja ${r.f || '-'} con pago registrado en ${r.mes_baja_excel || `${mm}/${yy}`}.` : `Baja con pago registrado (${r.motivo || r.motivo_raw || 'Sin motivo'}).`,
+            source: 'Bajas / pago',
+            fuente: 'Bajas / pago',
+            r: r.motivo || r.motivo_raw || 'Baja registrada',
+            monto: Number(r.monto || 0)
+        };
+    })));
     const allEmployees = app.employees || [];
     const sevRank = { Alta: 3, Media: 2, Baja: 1 };
     const sevColor = { Alta: '#dc2626', Media: '#f59e0b', Baja: '#0f766e' };
@@ -10006,6 +10211,7 @@ function renderIncidencias() {
     const getFuente = i => clean(i.source || i.fuente || 'Sin fuente');
     const getTipo = i => clean(i.t || i.tipo || 'Sin tipo');
     const haystack = i => txt([i.c, i.n, i.e, i.pa, i.dir, i.d, i.t, i.detalle, i.source, i.r, i.f].join(' '));
+    const search = txt(local.search);
 
     // Internal and global filter helper, ignoring month filter (used for Trend chart counts):
     const matchFiltersExceptMonth = (i) => {
@@ -10068,8 +10274,6 @@ function renderIncidencias() {
     const sevOpt = optsFrom(baseIncs, i => clean(i.sev || 'Baja'));
     const fuenteOpt = optsFrom(baseIncs, getFuente);
     const respOpt = optsFrom(baseIncs, getResp);
-    const search = txt(local.search);
-
     const incs = baseIncs.filter(i =>
         (local.tipo === 'ALL' || getTipo(i) === local.tipo) &&
         (local.sev === 'ALL' || clean(i.sev || 'Baja') === local.sev) &&
@@ -13764,6 +13968,98 @@ function getMapConfig() {
     return { scale: 3.5, originX: 500, originY: 250, jmTop: 18, jmLeft: 64, rdTop: 8, rdLeft: 78, ttTop: 34, ttLeft: 86 };
 }
 
+function applyBajaPeriodExclusionRule(targetApp) {
+    if (!targetApp || targetApp.__bajaPeriodExclusionApplied) return;
+    if (!Array.isArray(targetApp.employees) || !Array.isArray(targetApp.bajas_list)) return;
+
+    const normRuleText = (value) => String(value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toUpperCase()
+        .replace(/[^A-Z0-9]+/g, ' ')
+        .trim();
+    const validRuleCode = (value) => {
+        const code = String(value || '').trim().toUpperCase();
+        return !!code && !['NAN', 'NAT', '0', '-', 'PENDIENTE', 'SIN CODIGO'].includes(code);
+    };
+    const personRuleKey = (row) => {
+        const pa = normRuleText(row.pa || row.p || row.pais || row.country);
+        const empresa = normRuleText(row.e || row.empresa || row.company);
+        const code = String(row.c || row.codigo || row.code || '').trim().toUpperCase();
+        if (validRuleCode(code)) return `C:${pa}|${empresa}|${code}`;
+        const name = normRuleText(row.n || row.nombre || row.name);
+        return name ? `N:${pa}|${empresa}|${name}` : '';
+    };
+    const rowRulePeriod = (row) => {
+        const y = Number(row.y || row.year || row.anio || row.baja_y);
+        const m = Number(row.m || row.month || row.mes || row.baja_m);
+        return y && m ? (y * 12 + m) : null;
+    };
+
+    const bajaByPerson = new Map();
+    targetApp.bajas_list.forEach((baja) => {
+        const key = personRuleKey(baja);
+        const bajaPeriod = rowRulePeriod(baja);
+        if (!key || !bajaPeriod) return;
+        const previous = bajaByPerson.get(key);
+        if (!previous || bajaPeriod < previous.period) {
+            bajaByPerson.set(key, { period: bajaPeriod, row: baja });
+        }
+    });
+
+    const originalEmployees = targetApp.employees;
+    const keptEmployees = [];
+    const removedEmployees = [];
+    originalEmployees.forEach((employee) => {
+        const key = personRuleKey(employee);
+        const employeePeriod = rowRulePeriod(employee);
+        const bajaMatch = key ? bajaByPerson.get(key) : null;
+        if (bajaMatch && employeePeriod && employeePeriod > bajaMatch.period) {
+            const bajaRow = bajaMatch.row || {};
+            removedEmployees.push(Object.assign({}, employee, {
+                _excludedByBajaPeriodRule: true,
+                _bajaRuleBajaY: bajaRow.y || '',
+                _bajaRuleBajaM: bajaRow.m || '',
+                _bajaRuleBajaFecha: bajaRow.f || bajaRow.fecha || bajaRow.fecha_baja || ''
+            }));
+            return;
+        }
+        keptEmployees.push(employee);
+    });
+
+    targetApp.employees_raw_with_late_payments = removedEmployees;
+    targetApp._bajaPeriodRuleRemovedCount = removedEmployees.length;
+    targetApp.employees = keptEmployees;
+
+    if (Array.isArray(targetApp.summary)) {
+        const employeeGroupKeys = new Set();
+        const personSeenByGroup = new Set();
+        const hcByGroup = new Map();
+        originalEmployees.forEach((employee) => {
+            const groupKey = `${normRuleText(employee.pa || employee.p)}|${normRuleText(employee.e || employee.empresa)}|${Number(employee.y)}|${Number(employee.m)}`;
+            employeeGroupKeys.add(groupKey);
+        });
+        keptEmployees.forEach((employee) => {
+            const groupKey = `${normRuleText(employee.pa || employee.p)}|${normRuleText(employee.e || employee.empresa)}|${Number(employee.y)}|${Number(employee.m)}`;
+            const personKey = personRuleKey(employee) || normRuleText(employee.n || employee.nombre);
+            const uniqueKey = `${groupKey}|${personKey}`;
+            if (personSeenByGroup.has(uniqueKey)) return;
+            personSeenByGroup.add(uniqueKey);
+            hcByGroup.set(groupKey, (hcByGroup.get(groupKey) || 0) + 1);
+        });
+        targetApp.summary.forEach((summaryRow) => {
+            const groupKey = `${normRuleText(summaryRow.pa || summaryRow.p)}|${normRuleText(summaryRow.e || summaryRow.empresa)}|${Number(summaryRow.y)}|${Number(summaryRow.m)}`;
+            if (employeeGroupKeys.has(groupKey)) {
+                summaryRow.hc = hcByGroup.get(groupKey) || 0;
+            }
+        });
+    }
+
+    targetApp.__bajaPeriodExclusionApplied = true;
+    if (removedEmployees.length) {
+        console.log(`[HC RULE] ${removedEmployees.length} filas con pago posterior a baja fueron excluidas del HC.`);
+    }
+}
 function initApp() {
     console.log('Cantidades revisadas');
     if (window.hcFullData) {
@@ -13794,7 +14090,9 @@ function initApp() {
         console.log('  Base overrides active:', Object.keys(window.POSITION_OVERRIDES_INIT).length);
     }
 
-    window.app = app;
+    applyBajaPeriodExclusionRule(app);
+
+window.app = app;
     window.empsRaw = app.summary || [];
     window.allBajas = app.bajas_list || [];
 

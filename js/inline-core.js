@@ -1,4 +1,4 @@
-﻿            window._currentSubView = 'General';
+            window._currentSubView = 'General';
             Chart.defaults.color = '#9289c3';
 
             // Initialization logic wrapped to wait for async data
@@ -419,7 +419,99 @@
             window.app = { employees: [], summary: [], bajas_list: [], bajas_data: { reasons: {} }, incidencias: [], updated: "" };
             var app = window.app;
 
-            function initApp() {
+            function applyBajaPeriodExclusionRule(targetApp) {
+    if (!targetApp || targetApp.__bajaPeriodExclusionApplied) return;
+    if (!Array.isArray(targetApp.employees) || !Array.isArray(targetApp.bajas_list)) return;
+
+    const normRuleText = (value) => String(value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toUpperCase()
+        .replace(/[^A-Z0-9]+/g, ' ')
+        .trim();
+    const validRuleCode = (value) => {
+        const code = String(value || '').trim().toUpperCase();
+        return !!code && !['NAN', 'NAT', '0', '-', 'PENDIENTE', 'SIN CODIGO'].includes(code);
+    };
+    const personRuleKey = (row) => {
+        const pa = normRuleText(row.pa || row.p || row.pais || row.country);
+        const empresa = normRuleText(row.e || row.empresa || row.company);
+        const code = String(row.c || row.codigo || row.code || '').trim().toUpperCase();
+        if (validRuleCode(code)) return `C:${pa}|${empresa}|${code}`;
+        const name = normRuleText(row.n || row.nombre || row.name);
+        return name ? `N:${pa}|${empresa}|${name}` : '';
+    };
+    const rowRulePeriod = (row) => {
+        const y = Number(row.y || row.year || row.anio || row.baja_y);
+        const m = Number(row.m || row.month || row.mes || row.baja_m);
+        return y && m ? (y * 12 + m) : null;
+    };
+
+    const bajaByPerson = new Map();
+    targetApp.bajas_list.forEach((baja) => {
+        const key = personRuleKey(baja);
+        const bajaPeriod = rowRulePeriod(baja);
+        if (!key || !bajaPeriod) return;
+        const previous = bajaByPerson.get(key);
+        if (!previous || bajaPeriod < previous.period) {
+            bajaByPerson.set(key, { period: bajaPeriod, row: baja });
+        }
+    });
+
+    const originalEmployees = targetApp.employees;
+    const keptEmployees = [];
+    const removedEmployees = [];
+    originalEmployees.forEach((employee) => {
+        const key = personRuleKey(employee);
+        const employeePeriod = rowRulePeriod(employee);
+        const bajaMatch = key ? bajaByPerson.get(key) : null;
+        if (bajaMatch && employeePeriod && employeePeriod > bajaMatch.period) {
+            const bajaRow = bajaMatch.row || {};
+            removedEmployees.push(Object.assign({}, employee, {
+                _excludedByBajaPeriodRule: true,
+                _bajaRuleBajaY: bajaRow.y || '',
+                _bajaRuleBajaM: bajaRow.m || '',
+                _bajaRuleBajaFecha: bajaRow.f || bajaRow.fecha || bajaRow.fecha_baja || ''
+            }));
+            return;
+        }
+        keptEmployees.push(employee);
+    });
+
+    targetApp.employees_raw_with_late_payments = removedEmployees;
+    targetApp._bajaPeriodRuleRemovedCount = removedEmployees.length;
+    targetApp.employees = keptEmployees;
+
+    if (Array.isArray(targetApp.summary)) {
+        const employeeGroupKeys = new Set();
+        const personSeenByGroup = new Set();
+        const hcByGroup = new Map();
+        originalEmployees.forEach((employee) => {
+            const groupKey = `${normRuleText(employee.pa || employee.p)}|${normRuleText(employee.e || employee.empresa)}|${Number(employee.y)}|${Number(employee.m)}`;
+            employeeGroupKeys.add(groupKey);
+        });
+        keptEmployees.forEach((employee) => {
+            const groupKey = `${normRuleText(employee.pa || employee.p)}|${normRuleText(employee.e || employee.empresa)}|${Number(employee.y)}|${Number(employee.m)}`;
+            const personKey = personRuleKey(employee) || normRuleText(employee.n || employee.nombre);
+            const uniqueKey = `${groupKey}|${personKey}`;
+            if (personSeenByGroup.has(uniqueKey)) return;
+            personSeenByGroup.add(uniqueKey);
+            hcByGroup.set(groupKey, (hcByGroup.get(groupKey) || 0) + 1);
+        });
+        targetApp.summary.forEach((summaryRow) => {
+            const groupKey = `${normRuleText(summaryRow.pa || summaryRow.p)}|${normRuleText(summaryRow.e || summaryRow.empresa)}|${Number(summaryRow.y)}|${Number(summaryRow.m)}`;
+            if (employeeGroupKeys.has(groupKey)) {
+                summaryRow.hc = hcByGroup.get(groupKey) || 0;
+            }
+        });
+    }
+
+    targetApp.__bajaPeriodExclusionApplied = true;
+    if (removedEmployees.length) {
+        console.log(`[HC RULE] ${removedEmployees.length} filas con pago posterior a baja fueron excluidas del HC.`);
+    }
+}
+function initApp() {
                 console.log('Cantidades revisadas');
                 if (window.hcFullData) {
                     app = window.hcFullData;
@@ -449,7 +541,9 @@
                 }
 
                 // Re-bind global emps and bajas for other functions
-                window.app = app;
+                applyBajaPeriodExclusionRule(app);
+
+window.app = app;
                 window.empsRaw = app.summary || [];
                 window.allBajas = app.bajas_list || [];
 
@@ -5197,7 +5291,18 @@ function renderAdminPanel() {
                         return !isBaja;
                     });
 
-                    const tenures = activeEmpsForTenure.map(e => ({ ...e, tenure: e.t || 0 }));
+                    const calcTenureSafe = (emp) => {
+                        if (!emp) return 0;
+                        const rawTenure = Number(emp.t ?? emp.tenure ?? emp.antiguedad ?? emp.antiguedad_anios ?? emp.anios_antiguedad ?? 0);
+                        if (Number.isFinite(rawTenure) && rawTenure > 0) return rawTenure;
+                        const hireDate = emp.fi || emp.fecha_ingreso || emp.fechaIngreso || emp.ingreso || emp.f_ingreso || emp.hireDate;
+                        if (hireDate && typeof calcTenure === 'function') {
+                            const parsed = Number(calcTenure(hireDate));
+                            if (Number.isFinite(parsed) && parsed > 0) return parsed;
+                        }
+                        return 0;
+                    };
+                    const tenures = activeEmpsForTenure.map(e => ({ ...e, tenure: calcTenureSafe(e) }));
 
                     try {
                         renderExecutiveCharts(tenures, y, m, hiresSet, uniqueEmps, empsRaw, activeHC, bajasPeriod, filteredBajas);
@@ -8195,7 +8300,7 @@ function renderAdminPanel() {
 
                 // F.2 TOP 5 Antigüedad
                 const topAntRows = [...tenures].sort((a, b) => b.tenure - a.tenure).slice(0, 5);
-                const antList = document.getElementById('topAntiquityList');
+                const antList = document.getElementById('topAntiquityList') || document.getElementById('tenureRankingList');
                 if (antList) {
                     antList.innerHTML = topAntRows.map((e, i) => {
                         const st = getStyle(e.pa);
@@ -8868,7 +8973,7 @@ function renderAdminPanel() {
                 activeCharts.forEach(c => { if(c && typeof c.destroy === 'function') c.destroy(); }); 
                 activeCharts = [];
                 const { p: pais, e: emp, a, d, y: yr, m: mo } = getFilters();
-                const allIncs = app.incidencias || [];
+                const allIncs = (app.incidencias && app.incidencias.length ? app.incidencias : ((window.hcFullData && window.hcFullData.incidencias) || []));
 
                 const incs = allIncs.filter(i =>
                     (pais === 'ALL' ? true : i.pa === pais) &&

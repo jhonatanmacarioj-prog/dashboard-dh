@@ -50,7 +50,7 @@ function switchTab(n) {
     console.log('  switchTab:', n);
     window.activeTab = n;
 
-    const titles = ["HEADCOUNT", "ORGANIGRAMA", "DESVINCULACIONES", "INCIDENCIAS DE PAGO", "CONCILIACION ISR", "ANALISIS DE COSTOS", "CONFIGURACION", "HC DINAMICO"];
+    const titles = ["HEADCOUNT", "ORGANIGRAMA", "DESVINCULACIONES", "INCIDENCIAS DE PAGO", "CONCILIACIÓN ISR", "ANÁLISIS DE COSTOS", "CONFIGURACIÓN", "HC DINÁMICO"];
     const titleEl = document.getElementById('dynamicHCTitle');
     const fastTitle = titles[n] || "Dashboard";
 

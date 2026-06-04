@@ -371,9 +371,9 @@
                                 Object.entries(tabCfg).forEach(([t,cfg]) => {
                                     const el = document.getElementById(cfg.btn);
                                     if (!el) return;
-                                    el.style.background = (t===tab) ? cfg.color : 'transparent';
-                                    el.style.color      = (t===tab) ? '#fff'   : cfg.color;
-                                    el.style.border     = `1.5px solid ${cfg.color}`;
+                                    el.style.setProperty('--audit-color', cfg.color);
+                                    el.classList.toggle('is-active', t === tab);
+                                    el.style.color = cfg.color;
                                 });
 
                                 const badge    = document.getElementById('auditBadge');
@@ -469,10 +469,66 @@
                                             const missingList = peopleBridge.movementRows.filter(x => x.kind.includes('DESAPARECE') || x.kind.includes('FALTA'));
                                             const extraList = peopleBridge.movementRows.filter(x => x.kind.includes('BAJA') || x.kind.includes('SOBRA') || x.kind.includes('NUEVO'));
                                             const maxIssue = Math.max(c.missing, c.extra, 1);
-                                            const rowHtml = (items) => items.length ? items.map((x) => {
+                                                                                                                                    let netIssueRows = c.netDiff > 0
+                                                ? missingList.slice(0, Math.abs(c.netDiff))
+                                                : c.netDiff < 0
+                                                    ? extraList.slice(0, Math.abs(c.netDiff))
+                                                    : [];
+                                            const netIssueTarget = Math.abs(Number(c.netDiff || 0));
+                                            if (netIssueTarget && netIssueRows.length < netIssueTarget) {
+                                                const fallback = [];
+                                                const fallbackRows = [...discOnly, ...data.filter(r => r.diff !== 0 && !discOnly.includes(r))];
+                                                const pickNames = (r) => {
+                                                    if (c.netDiff > 0) return (r.diff < 0 ? (r.altas_names || []) : []);
+                                                    if (c.netDiff < 0) return (r.diff > 0 ? (r.bajas_names || []) : []);
+                                                    return [];
+                                                };
+                                                const lookupPersonByName = (name, baseRow) => {
+                                                    const key = auditNormText ? auditNormText(name) : String(name || '').toUpperCase();
+                                                    const sources = [...((window.app && window.app.employees) || []), ...((window.app && window.app.bajas_list) || [])];
+                                                    return sources.find(p => (!baseRow || ((!baseRow.pa || p.pa === baseRow.pa) && (!baseRow.e || p.e === baseRow.e))) && (auditNormText ? auditNormText(p.n) : String(p.n || '').toUpperCase()) === key) || {};
+                                                };
+                                                fallbackRows.forEach(r => {
+                                                    pickNames(r).forEach(name => {
+                                                        if (fallback.length >= netIssueTarget) return;
+                                                        const cleanName = auditCleanText(name || '');
+                                                        if (!cleanName) return;
+                                                        const key = cleanName.toUpperCase();
+                                                        if (fallback.some(x => String(x.row.n || '').toUpperCase() === key)) return;
+                                                        const personMatch = lookupPersonByName(cleanName, r);
+                                                        fallback.push({
+                                                            kind: c.netDiff > 0 ? 'FALTA EN HC NETO' : 'SOBRA EN HC NETO',
+                                                            row: { c: personMatch.c || '-', n: personMatch.n || cleanName, pa: personMatch.pa || r.pa || '', e: personMatch.e || r.e || '', p: personMatch.p || '' },
+                                                            monthLabel: `${months[r.m] || ''} ${r.y || ''}`.trim() || peopleBridge.labels.current,
+                                                            detail: c.netDiff > 0 ? ('FALTA EN PLANILLA CONSOLIDADA / HC NETO EN ' + ((personMatch.e || r.e || 'EMPRESA') + ' ' + (personMatch.pa || r.pa || '')).trim() + '. Revisar altas del mes.') : ('ESTA DE BAJA DE MAS EN BAJAS DE ' + ((personMatch.e || r.e || 'EMPRESA') + ' ' + (personMatch.pa || r.pa || '')).trim() + '. Revisar si la baja esta duplicada o aplicada de mas.')
+                                                        });
+                                                    });
+                                                });
+                                                if (fallback.length) netIssueRows = [...netIssueRows, ...fallback].slice(0, netIssueTarget);
+                                            }
+                                            const netIssueLabel = c.netDiff ? 'Diferencias' : 'Sin diferencia neta';
+                                            const netIssueTableRows = netIssueRows.map((x, i) => {
+                                                const mes = x.monthLabel || peopleBridge.labels.current || '-';
+                                                const scopeTxt = `${x.row.e || 'EMPRESA'} ${x.row.pa || ''}`.trim();
+                                                const motivo = x.detail || (x.kind === 'SOBRA EN HC NETO'
+                                                    ? `ESTA DE MAS EN PLANILLA CONSOLIDADA / HC NETO EN ${scopeTxt}. Revisar si esta de baja de mas en Bajas.`
+                                                    : x.kind === 'FALTA EN HC NETO'
+                                                        ? `FALTA EN PLANILLA CONSOLIDADA / HC NETO EN ${scopeTxt}. Revisar altas del mes.`
+                                                        : '-');
+                                                const search = `${x.row.c || ''} ${x.row.n || ''} ${mes} ${motivo}`.toLowerCase();
+                                                return `<tr data-search="${search}">
+                                                  <td style="padding:10px 12px;font-weight:900;color:#334155;white-space:nowrap;">${x.row.pa || '-'}</td>
+                                                  <td style="padding:10px 12px;font-weight:900;color:#334155;white-space:nowrap;">${x.row.e || '-'}</td>
+                                                  <td style="padding:10px 12px;font-weight:900;color:#334155;white-space:nowrap;">${x.row.c || '-'}</td>
+                                                  <td style="padding:10px 12px;font-weight:900;color:#0f172a;">${x.row.n || '-'}</td>
+                                                  <td style="padding:10px 12px;font-weight:800;color:#6366f1;white-space:nowrap;">${mes}</td>
+                                                  <td style="padding:10px 12px;color:#475569;font-weight:750;line-height:1.35;">${motivo}</td>
+                                                </tr>`;
+                                            }).join('');
+const rowHtml = (items) => items.length ? items.map((x) => {
                                                 const isBad = x.kind.includes('DESAPARECE') || x.kind.includes('FALTA');
                                                 const tone = isBad ? 'danger' : 'warn';
-                                                return `<article class="audit-person-card ${tone}">
+                                            return `<article class="audit-person-card ${tone}">
                                                   <div class="audit-person-status">
                                                     <span class="audit-issue-pill ${tone}">${x.kind}</span>
                                                     <span class="audit-code">${x.row.c || '-'}</span>
@@ -527,31 +583,31 @@
                                                   <small>Dashboard</small>
                                                 </div>
                                               </div>
-
-                                              <div class="audit-balance-grid">
-                                                <div class="audit-balance-card danger">
-                                                  <div class="audit-balance-head"><span>Faltan / desaparecen</span><strong>${c.missing}</strong></div>
-                                                  <div class="audit-bar"><i style="width:${Math.round((c.missing / maxIssue) * 100)}%;"></i></div>
-                                                  <p>${c.disappearedNoBaja} sin baja encontrada y ${c.bajaFueraPuente || 0} con baja fuera del puente.</p>
+                                              <div id="auditPeopleIssues" class="audit-net-table-card" style="background:#fff;border:1px solid rgba(99,102,241,0.14);border-radius:14px;padding:14px;box-shadow:0 10px 24px rgba(15,23,42,0.05);">
+                                                <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap;">
+                                                  <div>
+                                                    <div style="font-size:11px;font-weight:1000;color:#6366f1;text-transform:uppercase;letter-spacing:.6px;">${netIssueLabel}</div>
+                                                    <div style="font-family:'Montserrat';font-size:18px;font-weight:1000;color:#0f172a;">Total: ${netIssueRows.length}</div>
+                                                  </div>
+                                                  <span style="font-size:11px;font-weight:900;color:#64748b;background:#f8fafc;border-radius:999px;padding:6px 10px;">${peopleBridge.labels.current}</span>
                                                 </div>
-                                                <div class="audit-balance-card warn">
-                                                  <div class="audit-balance-head"><span>Sobran / siguen activos</span><strong>${c.extra}</strong></div>
-                                                  <div class="audit-bar"><i style="width:${Math.round((c.extra / maxIssue) * 100)}%;"></i></div>
-                                                  <p>${c.bajaStillActive} tienen baja, pero siguen dentro del HC neto.</p>
-                                                </div>
+                                                <table class="audit-table" style="width:100%;border-collapse:collapse;font-size:12px;">
+                                                  <thead>
+                                                    <tr style="background:#f8fafc;border-bottom:1px solid #e2e8f0;">
+                                                      <th style="padding:9px 12px;text-align:left;color:#64748b;font-size:10px;text-transform:uppercase;">Pais</th>
+                                                      <th style="padding:9px 12px;text-align:left;color:#64748b;font-size:10px;text-transform:uppercase;">Empresa</th>
+                                                      <th style="padding:9px 12px;text-align:left;color:#64748b;font-size:10px;text-transform:uppercase;">Codigo</th>
+                                                      <th style="padding:9px 12px;text-align:left;color:#64748b;font-size:10px;text-transform:uppercase;">Nombre</th>
+                                                      <th style="padding:9px 12px;text-align:left;color:#64748b;font-size:10px;text-transform:uppercase;">Mes</th>
+                                                      <th style="padding:9px 12px;text-align:left;color:#64748b;font-size:10px;text-transform:uppercase;">Motivo</th>
+                                                    </tr>
+                                                  </thead>
+                                                  <tbody>
+                                                    ${netIssueTableRows || '<tr><td colspan="6" style="padding:18px;text-align:center;color:#64748b;font-weight:900;">Sin personas para mostrar con el filtro actual.</td></tr>'}
+                                                  </tbody>
+                                                </table>
                                               </div>
-
-                                              <div id="auditPeopleIssues" class="audit-issue-grid">
-                                                <div class="audit-issue-panel">
-                                                  <div class="audit-panel-title"><span>Personas que faltan</span><b>${missingList.length}</b></div>
-                                                  <div class="audit-people-list">${rowHtml(missingList)}</div>
-                                                </div>
-                                                <div class="audit-issue-panel">
-                                                  <div class="audit-panel-title"><span>Personas que sobran</span><b>${extraList.length}</b></div>
-                                                  <div class="audit-people-list">${rowHtml(extraList)}</div>
-                                                </div>
-                                              </div>
-                                            </section>`;
+</section>`;
                                         })() : '';
                                         tableEl.innerHTML = bridgeHtml + `
                                         <details class="audit-raw-details">
@@ -1016,4 +1072,7 @@
 
                         // Make renderSustituciones point to renderAudit for compatibility
                         function renderSustituciones() { renderAudit(); }
+
+
+
 

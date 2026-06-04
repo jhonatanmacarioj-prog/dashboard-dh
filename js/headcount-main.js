@@ -450,7 +450,18 @@ function kpiCard(label, val, icon, color, view, statusType = "up", subLabel = ""
                         return !isBaja;
                     });
 
-                    const tenures = activeEmpsForTenure.map(e => ({ ...e, tenure: e.t || 0 }));
+                    const calcTenureSafe = (emp) => {
+                        if (!emp) return 0;
+                        const rawTenure = Number(emp.t ?? emp.tenure ?? emp.antiguedad ?? emp.antiguedad_anios ?? emp.anios_antiguedad ?? 0);
+                        if (Number.isFinite(rawTenure) && rawTenure > 0) return rawTenure;
+                        const hireDate = emp.fi || emp.fecha_ingreso || emp.fechaIngreso || emp.ingreso || emp.f_ingreso || emp.hireDate;
+                        if (hireDate && typeof calcTenure === 'function') {
+                            const parsed = Number(calcTenure(hireDate));
+                            if (Number.isFinite(parsed) && parsed > 0) return parsed;
+                        }
+                        return 0;
+                    };
+                    const tenures = activeEmpsForTenure.map(e => ({ ...e, tenure: calcTenureSafe(e) }));
 
                     try {
                         renderExecutiveCharts(tenures, y, m, hiresSet, uniqueEmps, empsRaw, activeHC, bajasPeriod, filteredBajas);
@@ -1021,15 +1032,18 @@ function kpiCard(label, val, icon, color, view, statusType = "up", subLabel = ""
                                         datasets: [{
                                             data: values,
                                             backgroundColor: colors,
-                                            borderWidth: 2,
-                                            borderColor: '#fff',
-                                            hoverOffset: 15
+                                            borderWidth: 4,
+                                            borderColor: '#ffffff',
+                                            hoverBorderWidth: 5,
+                                            hoverBorderColor: '#ffffff',
+                                            hoverOffset: 18,
+                                            spacing: 3
                                         }]
                                     },
                                     options: {
                                         responsive: true,
                                         maintainAspectRatio: false,
-                                        cutout: '60%',
+                                        cutout: '66%',
                                         layout: {
                                             padding: 20
                                         },
@@ -1043,7 +1057,7 @@ function kpiCard(label, val, icon, color, view, statusType = "up", subLabel = ""
                                                     return (val / total) > 0.04; // Umbral del 4% para mostrar etiqueta
                                                 },
                                                 color: '#fff',
-                                                font: { weight: '900', size: 11, family: "'Montserrat', sans-serif" }, 
+                                                font: { weight: '1000', size: 14, family: "'Montserrat', sans-serif" }, 
                                                 textShadowBlur: 4,
                                                 textShadowColor: 'rgba(0,0,0,0.4)',
                                                 formatter: (val, ctx) => {
@@ -1076,12 +1090,12 @@ function kpiCard(label, val, icon, color, view, statusType = "up", subLabel = ""
                                 
                                 return `
                                     <div class="dist-card-premium" style="display:flex; align-items:center; gap:15px; padding:10px 0; border-bottom:1px solid rgba(0,0,0,0.05); animation: fadeInRight 0.5s ease both ${idx * 0.05}s;">
-                                        <div style="width:4px; height:45px; background:${st.color}; border-radius:10px;"></div>
+                                        <div style="width:6px; height:52px; background:${st.color}; border-radius:12px; box-shadow:0 8px 18px ${st.color}33;"></div>
                                         <div style="flex:1; min-width:0;">
                                             <div style="font-size:13px; font-weight:1000; color:#64748b; text-transform:uppercase; letter-spacing:0.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${fullName}</div>
                                             <div style="display:flex; align-items:baseline; gap:6px; margin-top:2px;">
                                                 <span style="font-size:22px; font-weight:1000; color:#1e293b; line-height:1;">${val.toLocaleString()}</span>
-                                                <span style="font-size:9px; font-weight:800; color:#94a3b8; text-transform:uppercase;">COLABORADORES</span>
+                                                <span style="font-size:9px; font-weight:800; color:#94a3b8; text-transform:uppercase;">COLABORADORES</span><span class="dist-card-pct">${pct}%</span>
                                             </div>
                                         </div>
                                     </div>
@@ -2943,7 +2957,7 @@ function kpiCard(label, val, icon, color, view, statusType = "up", subLabel = ""
 
                 // F.2 TOP 5 Antigüedad
                 const topAntRows = [...tenures].sort((a, b) => b.tenure - a.tenure).slice(0, 5);
-                const antList = document.getElementById('topAntiquityList');
+                const antList = document.getElementById('topAntiquityList') || document.getElementById('tenureRankingList');
                 if (antList) {
                     antList.innerHTML = topAntRows.map((e, i) => {
                         const st = getStyle(e.pa);
@@ -3198,37 +3212,67 @@ function kpiCard(label, val, icon, color, view, statusType = "up", subLabel = ""
             function renderHeatmap(emps) {
                 const container = document.getElementById('regionalHeatmap');
                 if (!container) return;
-
-                const sourceEmps = emps || (cachedEmps ? cachedEmps.unique : []);
-                if (sourceEmps.length === 0) {
-                    container.innerHTML = `<div style="text-align:center; padding:40px; color:#94a3b8;">Sin datos de puestos</div>`;
+                const f = (typeof getFilters === 'function') ? getFilters() : {};
+                const sourceEmps = emps || (cachedEmps ? cachedEmps.unique : []) || [];
+                const mode = window._flagMode || 'hc';
+                const hcType = window._hcType || 'neto';
+                const isAllMonth = f.m === 'ALL' || f.m === '0' || f.m === 0 || f.m == null;
+                const targetY = parseInt(f.y || f.yc || new Date().getFullYear());
+                const targetM = (typeof normalizeMonth === 'function') ? normalizeMonth(f.m || f.mc || 0) : parseInt(f.m || f.mc || 0);
+                const matchBase = (row) => {
+                    const pa = row._pa || (typeof normalizePa === 'function' ? normalizePa(row.pa) : row.pa);
+                    const emp = (row.e || '').toUpperCase().trim();
+                    const area = (row.dir || row.area || '').toUpperCase().trim();
+                    const dept = (row.d || row.depto || '').toUpperCase().trim();
+                    const matchP = !f.countries || f.countries.length === 0 || f.countries.includes(pa);
+                    const matchE = !f.e || f.e === 'ALL' || emp === String(f.e || '').toUpperCase().trim();
+                    const matchA = !f.a || f.a === 'ALL' || area === String(f.a || '').toUpperCase().trim();
+                    const matchD = !f.d || f.d === 'ALL' || dept === String(f.d || '').toUpperCase().trim();
+                    return matchP && matchE && matchA && matchD;
+                };
+                let sourceRows = sourceEmps;
+                let metricLabel = hcType === 'bruto' ? 'HC BRUTO' : 'HC NETO';
+                if (mode === 'altas') {
+                    const allEmployees = window.allEmployees || window.employees || window.app?.employees || app?.employees || [];
+                    sourceRows = allEmployees.filter(e => {
+                        const yy = parseInt(e._fiY || e.yi || e.y || 0);
+                        const mm = parseInt(e._fiM || e.mi || e.m || 0);
+                        return matchBase(e) && (!targetY || yy === targetY) && (isAllMonth || mm === targetM);
+                    });
+                    metricLabel = 'ALTAS';
+                } else if (mode === 'bajas') {
+                    const allBajas = window.allBajas || window.app?.bajas_list || app?.bajas_list || [];
+                    sourceRows = allBajas.filter(b => {
+                        const yy = parseInt(b._y || b.y || 0);
+                        const mm = (typeof normalizeMonth === 'function') ? normalizeMonth(b._m || b.m) : parseInt(b._m || b.m || 0);
+                        return matchBase(b) && (!targetY || yy === targetY) && (isAllMonth || mm === targetM);
+                    });
+                    metricLabel = 'BAJAS';
+                }
+                const totalEl = document.getElementById('positionDensityTotal');
+                if (sourceRows.length === 0) {
+                    if (totalEl) totalEl.innerHTML = '<span>0</span><small>' + metricLabel + '</small>';
+                    container.innerHTML = '<div style="text-align:center; padding:40px; color:#94a3b8; font-weight:900;">Sin datos de puestos</div>';
                     return;
                 }
-
                 const showAll = document.getElementById('chkShowAllPos')?.checked || false;
                 const counts = {};
-                sourceEmps.forEach(e => {
-                    const p = (e.p || 'Sin Puesto').trim().toUpperCase();
+                sourceRows.forEach(e => {
+                    const p = (e.p || e.puesto || e.posicion || 'Sin Puesto').trim().toUpperCase();
                     counts[p] = (counts[p] || 0) + 1;
                 });
-
+                const total = Object.values(counts).reduce((a, b) => a + b, 0);
+                if (totalEl) totalEl.innerHTML = '<span>' + total.toLocaleString() + '</span><small>' + metricLabel + '</small>';
                 let sorted = Object.entries(counts).map(([name, hc]) => ({ name, hc })).sort((a, b) => b.hc - a.hc);
-                if (!showAll) sorted = sorted.slice(0, 10); // Match UI to show a few but big
-
-                container.innerHTML = `
-                    <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:15px; width:100%;">
-                        ${sorted.map((s, i) => {
-                    const op = i === 0 ? 0.9 : Math.max(0.1, 0.4 - (i * 0.04));
+                if (!showAll) sorted = sorted.slice(0, 10);
+                const maxVal = sorted[0]?.hc || 1;
+                container.innerHTML = '<div class="position-density-grid" style="display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap:14px; width:100%;">' + sorted.map(function(s, i) {
+                    const ratio = Math.max(0.18, s.hc / maxVal);
+                    const bg = i === 0 ? 'linear-gradient(135deg,#7c3aed,#a855f7)' : 'linear-gradient(135deg,rgba(139,92,246,' + (0.12 + ratio * 0.32) + '),rgba(59,130,246,' + (0.08 + ratio * 0.22) + '))';
+                    const color = i === 0 ? '#fff' : '#1e293b';
                     const isFull = i === sorted.length - 1 && sorted.length % 3 !== 0;
-                    return `
-                                <div style="grid-column: ${isFull ? '1 / -1' : 'auto'}; background:rgba(139, 92, 246, ${op}); color:${i === 0 ? '#fff' : '#1e293b'}; padding:22px; border-radius:16px; text-align:center; transition:0.3s; box-shadow:0 4px 12px rgba(139, 92, 246, 0.1); border:1px solid rgba(139, 92, 246, 0.2);">
-                                    <div style="font-size:26px; font-weight:1000; margin-bottom:4px;">${s.hc}</div>
-                                    <div style="font-size:9px; font-weight:900; text-transform:uppercase; opacity:0.8; letter-spacing:0.5px;">${s.name}</div>
-                                </div>
-                            `;
-                }).join('')}
-                    </div>
-                `;
+                    return '<div style="grid-column:' + (isFull ? '1 / -1' : 'auto') + '; background:' + bg + '; color:' + color + '; padding:18px 16px; border-radius:14px; text-align:left; transition:0.3s; box-shadow:0 10px 22px rgba(99,102,241,0.10); border:1px solid rgba(139,92,246,0.18); min-height:92px; display:flex; flex-direction:column; justify-content:space-between;"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;"><span style="font-size:27px; font-weight:1000; line-height:1;">' + s.hc.toLocaleString() + '</span><span style="font-size:10px;font-weight:1000;opacity:.78;">' + ((s.hc / total) * 100).toFixed(0) + '%</span></div><div style="font-size:10px; font-weight:1000; text-transform:uppercase; opacity:0.84; letter-spacing:0; line-height:1.25;">' + s.name + '</div></div>';
+                }).join('') + '</div>';
             }
 
 

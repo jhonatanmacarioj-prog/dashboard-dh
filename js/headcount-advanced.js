@@ -852,15 +852,15 @@ function openOrgChart() {
                             <h3 style="font-size:18px; font-weight:1000; color:#1e293b; margin:0;">   Detalle Mensual: <span style="color:var(--ac);">${mname} ${y}</span></h3>
                             <p style="font-size:11px; color:#64748b; font-weight:700; margin-top:4px;">Análisis profundo de bajas y movimientos</p>
                         </div>
-                        <button onclick="document.getElementById('calendarDetailRow').style.display='none'" style="background:#f1f5f9; border:none; color:#64748b; width:32px; height:32px; border-radius:50%; cursor:pointer; font-size:14px; display:flex; align-items:center; justify-content:center; transition:0.2s;" onmouseenter="this.style.background='#e2e8f0'" onmouseleave="this.style.background='#f1f5f9'"> </button>
+                        <button onclick="document.getElementById('calendarDetailRow').style.display='none'" style="background:#f1f5f9; border:none; color:#64748b; width:32px; height:32px; border-radius:50%; cursor:pointer; font-size:14px; display:flex; align-items:center; justify-content:center; transition:0.2s;" onmouseenter="this.style.background='#e2e8f0'" onmouseleave="this.style.background='#f1f5f9'">&times;</button>
                     </div>
-                    <div id="heatmapChartsGrid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:20px;">
-                        <div class="card-box" style="height:280px; background:#fff; box-shadow:none; border:1px solid #f1f5f9; padding:15px;"><canvas id="snapPa"></canvas></div>
-                        <div class="card-box" style="height:280px; background:#fff; box-shadow:none; border:1px solid #f1f5f9; padding:15px;"><canvas id="snapEmp"></canvas></div>
-                        <div class="card-box" style="height:280px; background:#fff; box-shadow:none; border:1px solid #f1f5f9; padding:15px;"><canvas id="snaparea"></canvas></div>
-                        <div class="card-box" style="height:280px; background:#fff; box-shadow:none; border:1px solid #f1f5f9; padding:15px;"><canvas id="snapDepto"></canvas></div>
-                        <div class="card-box" style="height:280px; background:#fff; box-shadow:none; border:1px solid #f1f5f9; padding:15px;"><canvas id="snapAnt"></canvas></div>
-                        <div class="card-box" style="height:280px; background:#fff; box-shadow:none; border:1px solid #f1f5f9; padding:15px;"><canvas id="snapMotivo"></canvas></div>
+                    <div id="heatmapChartsGrid" style="display:grid; grid-auto-flow:column; grid-auto-columns:minmax(300px,1fr); gap:16px; overflow-x:auto; padding-bottom:10px;">
+                        <div class="card-box" style="height:300px; min-width:300px; background:#fff; box-shadow:none; border:1px solid #e2e8f0; border-radius:14px; padding:15px;"><canvas id="snapPa"></canvas></div>
+                        <div class="card-box" style="height:300px; min-width:300px; background:#fff; box-shadow:none; border:1px solid #e2e8f0; border-radius:14px; padding:15px;"><canvas id="snapEmp"></canvas></div>
+                        <div class="card-box" style="height:300px; min-width:300px; background:#fff; box-shadow:none; border:1px solid #e2e8f0; border-radius:14px; padding:15px;"><canvas id="snaparea"></canvas></div>
+                        <div class="card-box" style="height:300px; min-width:300px; background:#fff; box-shadow:none; border:1px solid #e2e8f0; border-radius:14px; padding:15px;"><canvas id="snapDepto"></canvas></div>
+                        <div class="card-box" style="height:300px; min-width:300px; background:#fff; box-shadow:none; border:1px solid #e2e8f0; border-radius:14px; padding:15px;"><canvas id="snapAnt"></canvas></div>
+                        <div class="card-box" style="height:300px; min-width:300px; background:#fff; box-shadow:none; border:1px solid #e2e8f0; border-radius:14px; padding:15px;"><canvas id="snapMotivo"></canvas></div>
                     </div>
                 </div>
             `;
@@ -993,6 +993,11 @@ function openOrgChart() {
             });
 
             const deptMap = {};
+            window._retBreakdownDim = window._retBreakdownDim || 'dir';
+            const retDimConfig = { dir:{label:'Direcci&oacute;n',key:(b)=>b.dir||b.area||'Sin Direcci&oacute;n'}, d:{label:'Departamento',key:(b)=>b.d||b.depto||'Sin Departamento'}, e:{label:'Empresa',key:(b)=>b.e||'Sin Empresa'}, pa:{label:'Pa&iacute;s',key:(b)=>(window.paisMap&&window.paisMap[b.pa])||b.pa||'Sin Pa&iacute;s'} };
+            const retDim = retDimConfig[window._retBreakdownDim] ? window._retBreakdownDim : 'dir';
+            const retDimLabel = retDimConfig[retDim].label;
+            const getRetBreakdownKey = (b) => String(retDimConfig[retDim].key(b) || 'Otros').trim().toUpperCase();
             let earlyBajas = 0;
             let midBajas = 0;
             let seniorBajas = 0;
@@ -1021,7 +1026,7 @@ function openOrgChart() {
             };
 
             filteredBajas.forEach(b => {
-                const dept = b.d || 'Otros';
+                const dept = getRetBreakdownKey(b);
                 if (!deptMap[dept]) deptMap[dept] = { total: 0, early: 0, mid: 0, senior: 0 };
                 deptMap[dept].total++;
 
@@ -1333,7 +1338,7 @@ function openOrgChart() {
             let heatHtml = `<table class="rz-heatmap-table">
                 <thead>
                     <tr>
-                        <th style="color:#64748b; text-align:left;">Dpto</th>`;
+                        <th style="color:#64748b; text-align:left;">Dimension</th>`;
             heatMonths.forEach(hm => {
                 heatHtml += `<th style="color:#64748b; text-align:center;">${hm.label}</th>`;
             });
@@ -1356,24 +1361,20 @@ function openOrgChart() {
                     
                     let cellBg = 'rgba(139, 92, 246, 0.05)';
                     let cellColor = '#8b5cf6';
-                    let cellIcon = '🟢';
                     if (val > 6) {
                         cellBg = 'rgba(239, 68, 68, 0.15)';
                         cellColor = '#ef4444';
-                        cellIcon = '🔴';
                     } else if (val > 3) {
                         cellBg = 'rgba(139, 92, 246, 0.18)';
                         cellColor = '#8b5cf6';
-                        cellIcon = '🟣';
                     } else if (val > 1) {
                         cellBg = 'rgba(59, 130, 246, 0.15)';
                         cellColor = '#3b82f6';
-                        cellIcon = '🔵';
                     }
                     
                     heatHtml += `<td style="text-align:center;">
                         <div class="rz-heatmap-cell" style="background:${cellBg}; color:${cellColor}; font-size:9.5px; font-weight:800; display:inline-block; min-width:32px; padding:2px 4px; border-radius:4px;" title="Bajas: ${val}">
-                            ${cellIcon} ${val}
+                            ${val}
                         </div>
                     </td>`;
                 });
@@ -1387,6 +1388,50 @@ function openOrgChart() {
             heatHtml += `</tbody></table>`;
             const hmContainer = document.getElementById('retentionHeatmap');
             if (hmContainer) hmContainer.innerHTML = heatHtml;
+            {
+                const healthPanel = ctx.closest('.rz-chart-panel');
+                const heatPanel = document.getElementById('retentionHeatmap')?.closest('.rz-chart-panel');
+                const riskPanel = document.getElementById('chartRetentionRiskDist')?.closest('.rz-chart-panel');
+                const trendPanel = document.getElementById('chartRetentionTrend')?.closest('.rz-chart-panel');
+                const insightsPanel = document.getElementById('retentionInsights')?.closest('.rz-insights-panel');
+                const host = healthPanel?.parentElement;
+                if (host && healthPanel) {
+                    host.style.gridTemplateColumns = '1fr';
+                    host.style.gap = '22px';
+                    let heatInsightGrid = document.getElementById('retHeatInsightGrid');
+                    if (!heatInsightGrid) {
+                        heatInsightGrid = document.createElement('div');
+                        heatInsightGrid.id = 'retHeatInsightGrid';
+                        heatInsightGrid.style.cssText = 'display:grid;grid-template-columns:minmax(360px,1fr) minmax(360px,1fr);gap:22px;align-items:stretch;width:100%;margin:0;';
+                    }
+                    healthPanel.insertAdjacentElement('afterend', heatInsightGrid);
+                    if (heatPanel) {
+                        heatInsightGrid.appendChild(heatPanel);
+                        heatPanel.style.margin = '0';
+                        heatPanel.style.height = '100%';
+                    }
+                    if (insightsPanel) {
+                        heatInsightGrid.appendChild(insightsPanel);
+                        insightsPanel.style.margin = '0';
+                        insightsPanel.style.height = '100%';
+                        insightsPanel.style.display = 'flex';
+                        insightsPanel.style.flexDirection = 'column';
+                    }
+                    if (riskPanel && trendPanel) {
+                        let grid = document.getElementById('retRiskTrendGrid');
+                        if (!grid) {
+                            grid = document.createElement('div');
+                            grid.id = 'retRiskTrendGrid';
+                            grid.style.cssText = 'display:grid;grid-template-columns:minmax(360px,.96fr) minmax(420px,1.04fr);gap:22px;align-items:stretch;width:100%;margin:0;padding:18px;border-radius:18px;background:linear-gradient(135deg,#ffffff,#f8fafc);border:1px solid rgba(148,163,184,0.18);box-shadow:0 16px 34px rgba(15,23,42,0.06);';
+                        }
+                        (heatInsightGrid || healthPanel).insertAdjacentElement('afterend', grid);
+                        grid.appendChild(riskPanel);
+                        grid.appendChild(trendPanel);
+                        riskPanel.style.margin = '0';
+                        trendPanel.style.margin = '0';
+                    }
+                }
+            }
 
             // EXECUTIVE ACTION INSIGHTS ENGINE
             let insightsHtml = '';
@@ -1479,21 +1524,49 @@ function openOrgChart() {
         }
 function renderTenureThermometer(uniqueEmps) {
             const listEl = document.getElementById('tenureRankingList');
-            if (!listEl) return;
+
+            const tenureRows = (uniqueEmps && uniqueEmps.length ? uniqueEmps : (window.lastActiveHC || (window.app && window.app.employees) || (window.hcFullData && window.hcFullData.employees) || []));
+            const getHireDateStr = (e) => e && (
+                e.fi || e.f_ing || e.fecha_ingreso || e.fechaIngreso || e.fecha_alta || e.fechaAlta ||
+                e.fechadeingreso || e['FECHA INGRESO'] || e['Fecha Ingreso'] || e['FECHA DE INGRESO'] ||
+                (e._fiY && e._fiM ? `${e._fiY}-${String(e._fiM).padStart(2, '0')}-01` : '')
+            ) || '';
+            const getTenureVal = (e) => {
+                const hireDateStr = getHireDateStr(e);
+                const fromDate = (typeof calcTenure === 'function') ? Number(calcTenure(hireDateStr)) : 0;
+                if (Number.isFinite(fromDate) && fromDate > 0) return fromDate;
+                if (hireDateStr) {
+                    const parts = String(hireDateStr).trim().split(/[\/-]/).map(Number);
+                    let d = null;
+                    if (parts.length === 3 && parts.every(Number.isFinite)) {
+                        d = String(parts[0]).length === 4 ? new Date(parts[0], parts[1] - 1, parts[2]) : new Date(parts[2], parts[1] - 1, parts[0]);
+                    }
+                    if (d && !isNaN(d)) {
+                        const years = (Date.now() - d.getTime()) / 31557600000;
+                        if (years > 0 && years < 80) return years;
+                    }
+                }
+                const raw = Number(e && (e.t || e.tenure || e.antiguedad || e.antiguedad_anios || e.anios_antiguedad));
+                return raw > 0 ? raw : 0;
+            };
 
             const deptMap = {};
             let totalTenure = 0;
-            uniqueEmps.forEach(e => {
+            let validTenureCount = 0;
+            tenureRows.forEach(e => {
                 const dept = e.d || 'Otros';
                 if (!deptMap[dept]) deptMap[dept] = { total: 0, sum: 0 };
-                deptMap[dept].total++;
-                const hireDateStr = e.fi || e.fechadeingreso || e.fecha_ingreso || '';
-                const tVal = (typeof calcTenure === 'function') ? calcTenure(hireDateStr) : 0;
-                deptMap[dept].sum += tVal;
-                totalTenure += tVal;
+                const tVal = getTenureVal(e);
+                if (tVal > 0) {
+                    deptMap[dept].total++;
+                    deptMap[dept].sum += tVal;
+                    totalTenure += tVal;
+                    validTenureCount++;
+                }
             });
 
             const sorted = Object.entries(deptMap)
+                .filter(([, data]) => data.total > 0)
                 .map(([name, data]) => ({ name, avg: data.sum / data.total }))
                 .sort((a,b) => b.avg - a.avg);
 
@@ -1513,18 +1586,19 @@ function renderTenureThermometer(uniqueEmps) {
                     </div>
                 `;
             });
-            listEl.innerHTML = html;
+            if (listEl) listEl.innerHTML = html || '<div style="padding:22px;text-align:center;color:#94a3b8;font-size:12px;font-weight:900;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:14px;">Sin fechas de ingreso válidas para calcular antigüedad.</div>';
 
-            const globalAvg = uniqueEmps.length > 0 ? totalTenure / uniqueEmps.length : 0;
+            const globalAvg = validTenureCount > 0 ? totalTenure / validTenureCount : 0;
             const globEl = document.getElementById('avgTenureGlobal');
             if(globEl) {
-                globEl.innerText = globalAvg.toFixed(1);
+                globEl.innerText = validTenureCount > 0 ? globalAvg.toFixed(1) : '0.0';
             }
 
             // Tenure Dist Chart
             const dist = { '0-1': 0, '1-3': 0, '3-5': 0, '5+': 0 };
-            uniqueEmps.forEach(e => {
-                const t = (typeof calcTenure === 'function') ? calcTenure(e.fi) : 0;
+            tenureRows.forEach(e => {
+                const t = getTenureVal(e);
+                if (t <= 0) return;
                 if (t < 1) dist['0-1']++;
                 else if (t < 3) dist['1-3']++;
                 else if (t < 5) dist['3-5']++;
@@ -1553,5 +1627,7 @@ function renderTenureThermometer(uniqueEmps) {
                 });
             }
         }
+
+
 
 

@@ -131,6 +131,7 @@ function personKey(row) {
                 const btn6 = document.getElementById('btnHC6m');
                 const btn12 = document.getElementById('btnHC12m');
                 const btnAnio = document.getElementById('btnHCanio');
+                if (btnAnio) btnAnio.innerHTML = '1 A&Ntilde;O';
                 const currLen = window._hcViewLength || 6;
                 const isMirror = !!window._hcMirrorMode;
 
